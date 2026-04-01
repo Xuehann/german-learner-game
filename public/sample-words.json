@@ -1,0 +1,16 @@
+[
+  {
+    "id": "custom-001",
+    "english": "sausage",
+    "german": "die Wurst",
+    "category": "food",
+    "difficulty": "A1"
+  },
+  {
+    "id": "custom-002",
+    "english": "market",
+    "german": "der Markt",
+    "category": "place",
+    "difficulty": "A2"
+  }
+]
