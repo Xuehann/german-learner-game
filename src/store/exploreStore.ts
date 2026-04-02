@@ -204,7 +204,9 @@ export const useExploreStore = create<ExploreState>((set, get) => ({
 
       if (!response.ok) {
         if (response.status === 404) {
-          throw new Error('未命中明信片 API。请确认你是通过 Vite 本地服务地址访问（如 http://localhost:5173）。');
+          throw new Error(
+            '未命中明信片 API。若为线上环境，请确认 Vercel 已部署 `api/postcards/generate`；若为本地环境，请通过 Vite 地址访问（如 http://localhost:5173）。'
+          );
         }
 
         throw new Error(

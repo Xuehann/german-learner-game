@@ -9,6 +9,7 @@
 - JSON 词库上传（每次上传创建独立学习单元）
 - AI 文本生成词库（`POST /api/units/generate` 后端代理）
 - AI 城市明信片生成（`POST /api/postcards/generate`，文本走 OpenAI，图片优先走 Pexels）
+- API 核心逻辑共享：本地开发走 Vite 中间件，线上部署走 Vercel Serverless Functions
 - 本地持久化：设置、单词进度、会话历史
 - 本地持久化：明信片收藏册、探索会话
 - 德语输入辅助：Alt+A/O/U/S 与虚拟键盘 `ä ö ü ß`
@@ -38,6 +39,41 @@ PEXELS_API_KEY=your_pexels_key_here
 - `OPENAI_TEXT_MODEL` 可选，默认 `gpt-4.1-mini`
 - `PEXELS_API_KEY` 可选；配置后会按“城市 + 主题”搜图，失败时回退到城市图
 - 修改 `.env.local` 后需要重启 `npm run dev`
+
+## Vercel 部署（自动更新）
+### 1) 连接仓库
+- 在 Vercel 导入仓库：`Xuehann/german-learner-game`
+- 在 Project Settings -> Git 中把 Production Branch 设为 `main`
+
+### 2) 构建设置
+- Framework Preset: `Vite`
+- Build Command: `npm run build`
+- Output Directory: `dist`
+
+项目已包含 [`vercel.json`](./vercel.json)：
+- 保留 `/api/*` 给 Serverless Functions
+- 其余路由回退到 `index.html`，支持 `/explore`、`/units` 刷新直开
+
+### 3) 环境变量
+在 Vercel 的 `Production` 与 `Preview` 两个环境都配置：
+- `OPENAI_API_KEY`（必填）
+- `OPENAI_TEXT_MODEL`（可选，默认 `gpt-4.1-mini`）
+- `PEXELS_API_KEY`（可选）
+
+### 4) 自动更新策略
+- Push 到 `main`：自动触发 Production 部署
+- 创建/更新 PR：自动生成 Preview 部署
+- 合并 PR 到 `main`：自动发布新版本
+
+### 5) 密钥安全
+- 请将 API key 仅保存在本地 `.env.local` 和 Vercel 环境变量中，不要提交到 Git
+- 如果 key 曾在本地/聊天记录暴露，请先在 OpenAI / Pexels 控制台轮换再部署
+
+## 部署排查
+- 刚改了环境变量但线上没生效：在 Vercel 里重新触发一次部署
+- 路由刷新 404：确认项目根目录存在 `vercel.json` 且已重新部署
+- `/api/*` 返回 405：检查请求方法是否为 `POST`
+- `/api/postcards/generate` 返回 404：确认当前部署包含 `api/postcards/generate.ts`，并在 Vercel 的 Deployments 中使用最新 commit
 
 ## 测试
 ```bash
