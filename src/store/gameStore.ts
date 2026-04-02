@@ -57,13 +57,6 @@ const DAY_MS = 24 * 60 * 60 * 1000;
 const startOfLocalDay = (date: Date): Date =>
   new Date(date.getFullYear(), date.getMonth(), date.getDate());
 
-const toLocalDateKey = (date: Date): string => {
-  const y = date.getFullYear();
-  const m = String(date.getMonth() + 1).padStart(2, '0');
-  const d = String(date.getDate()).padStart(2, '0');
-  return `${y}-${m}-${d}`;
-};
-
 const normalizePlanStartDate = (value?: string): string => {
   if (value) {
     const parsed = new Date(value);
@@ -486,22 +479,6 @@ const hasLegacyArticleOrder = (runtime: {
   return runtime.orderQueue.some((order) => order.type === 'article');
 };
 
-const RUNTIME_PHASES: GamePhase[] = [
-  'intro_door',
-  'intro_goal',
-  'serving_order',
-  'show_order_feedback',
-  'shop'
-];
-
-const normalizeRuntimePhase = (phase: unknown): GamePhase => {
-  if (typeof phase === 'string' && RUNTIME_PHASES.includes(phase as GamePhase)) {
-    return phase as GamePhase;
-  }
-
-  return 'serving_order';
-};
-
 const buildOrder = (
   allWords: Word[],
   progressMap: Record<string, WordProgress>,
@@ -811,20 +788,9 @@ export const useGameStore = create<GameState>((set, get) => ({
     const allWords = rebuildAllWords(unitWordsMap, activeUnitId);
 
     const runtime = loadRuntimeSnapshot();
-    const todayKey = toLocalDateKey(new Date());
-    const shouldPlayIntroToday = settings.lastIntroDate !== todayKey;
-    const nextSettings = shouldPlayIntroToday
-      ? {
-          ...settings,
-          lastIntroDate: todayKey
-        }
-      : settings;
+    const nextSettings = settings;
 
     if (runtime && !runtime.businessDay.isCompleted && !hasLegacyArticleOrder(runtime)) {
-      const phase = shouldPlayIntroToday ? 'intro_door' : normalizeRuntimePhase(runtime.phase);
-      const phaseBeforeShop = runtime.phaseBeforeShop
-        ? normalizeRuntimePhase(runtime.phaseBeforeShop)
-        : null;
       const hydratedDay = hydrateBusinessDay(runtime.businessDay, nextSettings, allWords);
 
       set({
@@ -845,22 +811,20 @@ export const useGameStore = create<GameState>((set, get) => ({
         orderQueue: runtime.orderQueue,
         currentOrder: runtime.currentOrder,
         satisfaction: runtime.satisfaction,
-        phase,
-        phaseBeforeShop,
+        phase: 'intro_door',
+        phaseBeforeShop: null,
         orderStartedAtMs: Date.now()
       });
 
       saveGameSettings(nextSettings);
-      if (shouldPlayIntroToday) {
-        persistRuntimeFromState({
-          businessDay: hydratedDay,
-          currentOrder: runtime.currentOrder,
-          orderQueue: runtime.orderQueue,
-          satisfaction: runtime.satisfaction,
-          phase: 'intro_door',
-          phaseBeforeShop: null
-        });
-      }
+      persistRuntimeFromState({
+        businessDay: hydratedDay,
+        currentOrder: runtime.currentOrder,
+        orderQueue: runtime.orderQueue,
+        satisfaction: runtime.satisfaction,
+        phase: 'intro_door',
+        phaseBeforeShop: null
+      });
       return;
     }
 
@@ -923,16 +887,7 @@ export const useGameStore = create<GameState>((set, get) => ({
       spentToday: 0
     };
 
-    const todayKey = toLocalDateKey(new Date());
-    const shouldPlayIntro = settings.lastIntroDate !== todayKey;
-    const nextPhase: GamePhase = shouldPlayIntro ? 'intro_door' : 'serving_order';
-
-    const nextSettings = shouldPlayIntro
-      ? {
-          ...settings,
-          lastIntroDate: todayKey
-        }
-      : settings;
+    const nextPhase: GamePhase = 'intro_door';
 
     set({
       businessDay,
@@ -946,11 +901,11 @@ export const useGameStore = create<GameState>((set, get) => ({
       answers: [],
       satisfaction: DEFAULT_SATISFACTION,
       coins: nextCoins,
-      settings: nextSettings
+      settings
     });
 
     saveCoinWallet(nextCoins);
-    saveGameSettings(nextSettings);
+    saveGameSettings(settings);
 
     persistRuntimeFromState({
       businessDay,

@@ -6,6 +6,7 @@ import {
   resolveLearningPool,
   useGameStore
 } from './gameStore';
+import { saveGameSettings, saveRuntimeSnapshot } from '../lib/storage';
 import type { Word, WordProgress } from '../types';
 
 const words: Word[] = [
@@ -31,6 +32,13 @@ const words: Word[] = [
     sourceType: 'imported'
   }
 ];
+
+const toLocalDateKey = (date: Date): string => {
+  const y = date.getFullYear();
+  const m = String(date.getMonth() + 1).padStart(2, '0');
+  const d = String(date.getDate()).padStart(2, '0');
+  return `${y}-${m}-${d}`;
+};
 
 describe('resolveLearningPool', () => {
   it('prefers imported words when user has uploaded words', () => {
@@ -127,5 +135,63 @@ describe('updatePlanDaysForCurrentDay', () => {
     const beforeGoal = beforeDay?.goal.newMasteredTarget ?? 0;
     const afterGoal = afterDay?.goal.newMasteredTarget ?? 0;
     expect(afterGoal).toBeLessThanOrEqual(beforeGoal);
+  });
+});
+
+describe('intro entry behavior', () => {
+  beforeEach(() => {
+    window.localStorage.clear();
+    useGameStore.getState().resetAllLocalData();
+  });
+
+  it('restores runtime progress but always enters intro_door on initializeGame', () => {
+    const current = useGameStore.getState();
+    const businessDay = current.businessDay;
+    expect(businessDay).not.toBeNull();
+
+    const runtimeBusinessDay = {
+      ...businessDay!,
+      progress: {
+        ...businessDay!.progress,
+        newMastered: 3
+      }
+    };
+
+    saveRuntimeSnapshot({
+      businessDay: runtimeBusinessDay,
+      orderQueue: current.orderQueue,
+      currentOrder: current.currentOrder,
+      satisfaction: current.satisfaction,
+      phase: 'serving_order',
+      phaseBeforeShop: null
+    });
+
+    saveGameSettings({
+      ...current.settings,
+      lastIntroDate: toLocalDateKey(new Date())
+    });
+
+    useGameStore.setState({
+      phase: 'shop',
+      businessDay: null
+    });
+
+    useGameStore.getState().initializeGame();
+
+    const restored = useGameStore.getState();
+    expect(restored.phase).toBe('intro_door');
+    expect(restored.businessDay?.progress.newMastered).toBe(3);
+  });
+
+  it('starts every new business day from intro_door even when lastIntroDate is today', () => {
+    const todayKey = toLocalDateKey(new Date());
+
+    useGameStore.getState().updateSettings({
+      lastIntroDate: todayKey
+    });
+    useGameStore.getState().startBusinessDay();
+
+    const state = useGameStore.getState();
+    expect(state.phase).toBe('intro_door');
   });
 });
