@@ -268,6 +268,7 @@ export function GamePage() {
 
   const isServing = phase === 'serving_order';
   const disabledInput = !isServing || !currentOrder;
+  const isSuccessfulCut = phase === 'show_order_feedback' && feedback?.type === 'correct';
 
   const saveIntroGoalPlanDays = () => {
     const parsed = Number.parseInt(introGoalPlanDaysInput, 10);
@@ -527,6 +528,7 @@ export function GamePage() {
 
                     <motion.div
                       key={`knife-${cutAnimTick}`}
+                      data-testid="knife"
                       className="absolute right-8 top-[10px] h-14 w-[10px] origin-top rounded-sm bg-[#2f3138] shadow-[0_2px_0_#18191d]"
                       initial={{ y: -34, rotate: -24 }}
                       animate={
@@ -537,33 +539,50 @@ export function GamePage() {
                       transition={{ duration: 1.05, ease: 'easeInOut' }}
                     />
 
-                    <motion.div
-                      key={`left-piece-${cutAnimTick}`}
-                      className="absolute left-[calc(50%-82px)] top-[58px] h-8 w-[74px] rounded-l-full border-2"
-                      style={{ borderColor: palette.fleck, background: palette.shell }}
-                      initial={{ x: 0, rotate: 0 }}
-                      animate={feedback?.type === 'correct' ? { x: -26, rotate: -11 } : { x: 0, rotate: 0 }}
-                      transition={{ duration: 1.05, ease: 'easeInOut' }}
-                    >
-                      <div
-                        className="mx-1 mt-[5px] h-[18px] rounded-l-full"
-                        style={{ background: `linear-gradient(180deg, ${palette.core} 0%, ${palette.shell} 100%)` }}
-                      />
-                    </motion.div>
+                    {isSuccessfulCut ? (
+                      <>
+                        <motion.div
+                          key={`left-piece-${cutAnimTick}`}
+                          data-testid="sausage-half-left"
+                          className="absolute left-[calc(50%-82px)] top-[58px] h-8 w-[74px] rounded-l-full border-2"
+                          style={{ borderColor: palette.fleck, background: palette.shell }}
+                          initial={{ x: 0, rotate: 0 }}
+                          animate={{ x: -26, rotate: -11 }}
+                          transition={{ duration: 1.05, ease: 'easeInOut' }}
+                        >
+                          <div
+                            className="mx-1 mt-[5px] h-[18px] rounded-l-full"
+                            style={{ background: `linear-gradient(180deg, ${palette.core} 0%, ${palette.shell} 100%)` }}
+                          />
+                        </motion.div>
 
-                    <motion.div
-                      key={`right-piece-${cutAnimTick}`}
-                      className="absolute left-[calc(50%-2px)] top-[58px] h-8 w-[74px] rounded-r-full border-2"
-                      style={{ borderColor: palette.fleck, background: palette.shell }}
-                      initial={{ x: 0, rotate: 0 }}
-                      animate={feedback?.type === 'correct' ? { x: 26, rotate: 11 } : { x: 0, rotate: 0 }}
-                      transition={{ duration: 1.05, ease: 'easeInOut' }}
-                    >
+                        <motion.div
+                          key={`right-piece-${cutAnimTick}`}
+                          data-testid="sausage-half-right"
+                          className="absolute left-[calc(50%-2px)] top-[58px] h-8 w-[74px] rounded-r-full border-2"
+                          style={{ borderColor: palette.fleck, background: palette.shell }}
+                          initial={{ x: 0, rotate: 0 }}
+                          animate={{ x: 26, rotate: 11 }}
+                          transition={{ duration: 1.05, ease: 'easeInOut' }}
+                        >
+                          <div
+                            className="mx-1 mt-[5px] h-[18px] rounded-r-full"
+                            style={{ background: `linear-gradient(180deg, ${palette.core} 0%, ${palette.shell} 100%)` }}
+                          />
+                        </motion.div>
+                      </>
+                    ) : (
                       <div
-                        className="mx-1 mt-[5px] h-[18px] rounded-r-full"
-                        style={{ background: `linear-gradient(180deg, ${palette.core} 0%, ${palette.shell} 100%)` }}
-                      />
-                    </motion.div>
+                        data-testid="sausage-whole"
+                        className="absolute left-[calc(50%-82px)] top-[58px] h-8 w-[154px] rounded-full border-2"
+                        style={{ borderColor: palette.fleck, background: palette.shell }}
+                      >
+                        <div
+                          className="mx-1 mt-[5px] h-[18px] rounded-full"
+                          style={{ background: `linear-gradient(180deg, ${palette.core} 0%, ${palette.shell} 100%)` }}
+                        />
+                      </div>
+                    )}
 
                     <AnimatePresence>
                       {feedback?.type === 'correct' && phase === 'show_order_feedback' && (

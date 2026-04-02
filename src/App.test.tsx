@@ -66,4 +66,113 @@ describe('App', () => {
     await user.click(screen.getByRole('link', { name: '返回营业台' }));
     expect(await screen.findByText('Wortwurst Metzgerei')).toBeInTheDocument();
   });
+
+  it('shows whole sausage during serving_order', async () => {
+    render(<App />);
+    expect(await screen.findByText('Wortwurst Metzgerei')).toBeInTheDocument();
+
+    act(() => {
+      useGameStore.setState({
+        phase: 'serving_order',
+        feedback: null
+      });
+    });
+
+    expect(screen.getByTestId('knife')).toBeInTheDocument();
+    expect(screen.getByTestId('sausage-whole')).toBeInTheDocument();
+    expect(screen.queryByTestId('sausage-half-left')).not.toBeInTheDocument();
+    expect(screen.queryByTestId('sausage-half-right')).not.toBeInTheDocument();
+  });
+
+  it('shows split sausage on correct feedback', async () => {
+    render(<App />);
+    expect(await screen.findByText('Wortwurst Metzgerei')).toBeInTheDocument();
+
+    act(() => {
+      useGameStore.setState({
+        phase: 'show_order_feedback',
+        feedback: {
+          type: 'correct',
+          title: '订单完成',
+          correctAnswer: 'der Apfel',
+          userInput: 'der Apfel'
+        }
+      });
+    });
+
+    expect(screen.getByTestId('knife')).toBeInTheDocument();
+    expect(screen.queryByTestId('sausage-whole')).not.toBeInTheDocument();
+    expect(screen.getByTestId('sausage-half-left')).toBeInTheDocument();
+    expect(screen.getByTestId('sausage-half-right')).toBeInTheDocument();
+  });
+
+  it('keeps whole sausage on wrong or skip feedback', async () => {
+    render(<App />);
+    expect(await screen.findByText('Wortwurst Metzgerei')).toBeInTheDocument();
+
+    act(() => {
+      useGameStore.setState({
+        phase: 'show_order_feedback',
+        feedback: {
+          type: 'wrong',
+          title: '订单出错',
+          correctAnswer: 'der Apfel',
+          userInput: 'die Apfel',
+          requiresManualContinue: true
+        }
+      });
+    });
+
+    expect(screen.getByTestId('sausage-whole')).toBeInTheDocument();
+    expect(screen.queryByTestId('sausage-half-left')).not.toBeInTheDocument();
+    expect(screen.queryByTestId('sausage-half-right')).not.toBeInTheDocument();
+
+    act(() => {
+      useGameStore.setState({
+        phase: 'show_order_feedback',
+        feedback: {
+          type: 'skip',
+          title: '你跳过了订单',
+          correctAnswer: 'der Apfel',
+          userInput: '',
+          requiresManualContinue: true
+        }
+      });
+    });
+
+    expect(screen.getByTestId('sausage-whole')).toBeInTheDocument();
+    expect(screen.queryByTestId('sausage-half-left')).not.toBeInTheDocument();
+    expect(screen.queryByTestId('sausage-half-right')).not.toBeInTheDocument();
+  });
+
+  it('resets to whole sausage after leaving correct feedback', async () => {
+    render(<App />);
+    expect(await screen.findByText('Wortwurst Metzgerei')).toBeInTheDocument();
+
+    act(() => {
+      useGameStore.setState({
+        phase: 'show_order_feedback',
+        feedback: {
+          type: 'correct',
+          title: '订单完成',
+          correctAnswer: 'der Apfel',
+          userInput: 'der Apfel'
+        }
+      });
+    });
+
+    expect(screen.getByTestId('sausage-half-left')).toBeInTheDocument();
+    expect(screen.getByTestId('sausage-half-right')).toBeInTheDocument();
+
+    act(() => {
+      useGameStore.setState({
+        phase: 'serving_order',
+        feedback: null
+      });
+    });
+
+    expect(screen.getByTestId('sausage-whole')).toBeInTheDocument();
+    expect(screen.queryByTestId('sausage-half-left')).not.toBeInTheDocument();
+    expect(screen.queryByTestId('sausage-half-right')).not.toBeInTheDocument();
+  });
 });
