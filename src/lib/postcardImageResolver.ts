@@ -1,4 +1,4 @@
-import type { CityTheme, PostcardImageSource } from '../types';
+import type { CityTheme, PostcardImageSource } from '../types.js';
 
 export interface ResolvedPostcardImage {
   imageUrl: string;

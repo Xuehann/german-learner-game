@@ -1,5 +1,5 @@
-import { CITY_THEME_META, getThemeFacts } from '../data/germanCities';
-import type { CityProfile, CityTheme } from '../types';
+import { CITY_THEME_META, getThemeFacts } from '../data/germanCities.js';
+import type { CityProfile, CityTheme } from '../types.js';
 
 interface BuildPostcardPromptOptions {
   city: CityProfile;

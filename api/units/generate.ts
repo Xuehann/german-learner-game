@@ -1,7 +1,7 @@
 import {
   handleUnitGenerateRequest,
   normalizeRequestBody
-} from '../../src/server/learningApi';
+} from '../../src/server/learningApi.js';
 
 type VercelRequestLike = {
   method?: string;

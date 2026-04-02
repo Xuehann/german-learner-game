@@ -1,4 +1,4 @@
-import type { CityProfile, CityTheme, CityThemeFacts } from '../types';
+import type { CityProfile, CityTheme, CityThemeFacts } from '../types.js';
 
 export const CITY_THEME_META: Record<
   CityTheme,

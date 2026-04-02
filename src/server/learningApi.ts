@@ -1,7 +1,7 @@
-import { getCityById, getThemeFacts } from '../data/germanCities';
-import { resolvePostcardImage } from '../lib/postcardImageResolver';
-import { buildPostcardPrompt } from '../lib/postcardPrompt';
-import type { CityTheme, PostcardImageSource } from '../types';
+import { getCityById, getThemeFacts } from '../data/germanCities.js';
+import { resolvePostcardImage } from '../lib/postcardImageResolver.js';
+import { buildPostcardPrompt } from '../lib/postcardPrompt.js';
+import type { CityTheme, PostcardImageSource } from '../types.js';
 
 export type UnitGenerateRequest = {
   unitName?: string;
