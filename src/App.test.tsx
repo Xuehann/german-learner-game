@@ -1,7 +1,8 @@
-import { render, screen } from '@testing-library/react';
+import { act, render, screen } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { beforeEach, describe, expect, it } from 'vitest';
 import App from './App';
+import { useGameStore } from './store/gameStore';
 
 describe('App', () => {
   beforeEach(() => {
@@ -21,6 +22,20 @@ describe('App', () => {
 
     render(<App />);
     expect(await screen.findByText('词库中心')).toBeInTheDocument();
+  });
+
+  it('shows only 商店（金币兑换）入口 in intro_goal phase', async () => {
+    render(<App />);
+
+    expect(await screen.findByText('Wortwurst Metzgerei')).toBeInTheDocument();
+
+    act(() => {
+      useGameStore.setState({ phase: 'intro_goal' });
+    });
+
+    expect(screen.getByText('今日运营目标')).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: '商店（金币兑换）' })).toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: '先逛商店' })).not.toBeInTheDocument();
   });
 
   it('navigates between game and units pages', async () => {

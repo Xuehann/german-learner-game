@@ -324,13 +324,6 @@ export function GamePage() {
                 >
                   开始营业
                 </button>
-                <button
-                  type="button"
-                  onClick={() => openShop()}
-                  className="rounded border-4 border-[#69431f] bg-[#b97531] px-6 py-2 text-white shadow-[0_4px_0_#633814]"
-                >
-                  先逛商店
-                </button>
               </div>
             </section>
           )}
