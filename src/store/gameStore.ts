@@ -157,15 +157,15 @@ const DEFAULT_COLLECTION: SausageCollection = {
   displaySkinId: 'classic-link'
 };
 
-const CUSTOMER_NAMES = ['Anna', 'Lukas', 'Mia', 'Jonas', 'Lea', 'Noah', 'Emma', 'Paul'];
-const CUSTOMER_AVATARS = ['🧑‍🍳', '👨‍🔧', '👩‍💼', '🧔', '👩‍🦰', '🧢'];
+const CUSTOMER_NAMES = ['Bär', 'Hund', 'Fuchs', 'Igel', 'Eule'];
+const CUSTOMER_AVATARS = ['🧑‍🍳', '👨‍🔧', '👩‍💼', '🧔', '👩‍🦰'];
 const FEEDBACK_SPEECHES: Record<GameFeedback['type'], string[]> = {
   correct: ['Gut gemacht!', 'Perfekt!', 'Sehr gut!', 'Ausgezeichnet!'],
   wrong: ['Das war nicht richtig.', 'Versuch es noch einmal.', 'Fast, aber nicht ganz.', 'Schade, noch mal bitte.'],
   skip: ['Ich warte dann auf die nächste Bestellung.', 'Alles klar, wir probieren die nächste Runde.', "Kein Problem, weiter geht's."]
 };
 
-const QUEUE_SIZE = 3;
+const QUEUE_SIZE = 5;
 const DAY_CLEAR_BONUS_COINS = 28;
 
 const normalizeInput = (input: string): string => input.trim().replace(/\s+/g, ' ');
@@ -577,6 +577,61 @@ const buildOrder = (
   };
 };
 
+const buildOrderAvoidingSameCustomer = (
+  allWords: Word[],
+  progressMap: Record<string, WordProgress>,
+  pendingCorrectionWordIds: string[],
+  previousCustomerName?: string
+): Order => {
+  const maxRetry = 12;
+  let attempt = 0;
+  let order = buildOrder(allWords, progressMap, pendingCorrectionWordIds);
+
+  while (previousCustomerName && order.customer.name === previousCustomerName && attempt < maxRetry) {
+    order = buildOrder(allWords, progressMap, pendingCorrectionWordIds);
+    attempt += 1;
+  }
+
+  return order;
+};
+
+const fillQueueToSize = (
+  baseQueue: Order[],
+  allWords: Word[],
+  progressMap: Record<string, WordProgress>,
+  pendingCorrectionWordIds: string[],
+  size = QUEUE_SIZE
+): Order[] => {
+  const nextQueue = [...baseQueue];
+
+  while (nextQueue.length < size) {
+    const prevName = nextQueue[nextQueue.length - 1]?.customer.name;
+    nextQueue.push(buildOrderAvoidingSameCustomer(allWords, progressMap, pendingCorrectionWordIds, prevName));
+  }
+
+  return nextQueue.slice(0, size);
+};
+
+const normalizeQueueNoAdjacentSameCustomer = (
+  queue: Order[],
+  allWords: Word[],
+  progressMap: Record<string, WordProgress>,
+  pendingCorrectionWordIds: string[]
+): Order[] => {
+  const normalized: Order[] = [];
+
+  queue.forEach((order) => {
+    const prevName = normalized[normalized.length - 1]?.customer.name;
+    if (prevName && order.customer.name === prevName) {
+      normalized.push(buildOrderAvoidingSameCustomer(allWords, progressMap, pendingCorrectionWordIds, prevName));
+      return;
+    }
+    normalized.push(order);
+  });
+
+  return normalized;
+};
+
 type AIState = 'idle' | 'loading' | 'error' | 'ready';
 
 interface GameState {
@@ -712,10 +767,7 @@ const rebuildRunningDayForNewPool = (params: {
     goalComputedAt: new Date().toISOString()
   };
 
-  const nextQueue: Order[] = [];
-  while (nextQueue.length < QUEUE_SIZE) {
-    nextQueue.push(buildOrder(allWords, wordProgressMap, nextBusinessDay.pendingCorrectionWordIds));
-  }
+  const nextQueue = fillQueueToSize([], allWords, wordProgressMap, nextBusinessDay.pendingCorrectionWordIds);
 
   return {
     businessDay: nextBusinessDay,
@@ -845,6 +897,25 @@ export const useGameStore = create<GameState>((set, get) => ({
 
     if (runtime && !runtime.businessDay.isCompleted && !hasLegacyArticleOrder(runtime)) {
       const hydratedDay = hydrateBusinessDay(runtime.businessDay, nextSettings, allWords);
+      const restoredCurrent = runtime.currentOrder;
+      const dedupedBaseQueue =
+        restoredCurrent === null
+          ? [...runtime.orderQueue]
+          : [restoredCurrent, ...runtime.orderQueue.filter((order) => order.id !== restoredCurrent.id)];
+
+      const normalizedQueue = normalizeQueueNoAdjacentSameCustomer(
+        dedupedBaseQueue,
+        allWords,
+        wordProgressMap,
+        hydratedDay.pendingCorrectionWordIds
+      );
+      const restoredQueue = fillQueueToSize(
+        normalizedQueue,
+        allWords,
+        wordProgressMap,
+        hydratedDay.pendingCorrectionWordIds
+      );
+      const nextCurrent = restoredQueue[0] ?? null;
 
       set({
         isInitialized: true,
@@ -861,8 +932,8 @@ export const useGameStore = create<GameState>((set, get) => ({
         },
         collection,
         businessDay: hydratedDay,
-        orderQueue: runtime.orderQueue,
-        currentOrder: runtime.currentOrder,
+        orderQueue: restoredQueue,
+        currentOrder: nextCurrent,
         satisfaction: runtime.satisfaction,
         phase: 'intro_door',
         phaseBeforeShop: null,
@@ -872,8 +943,8 @@ export const useGameStore = create<GameState>((set, get) => ({
       saveGameSettings(nextSettings);
       persistRuntimeFromState({
         businessDay: hydratedDay,
-        currentOrder: runtime.currentOrder,
-        orderQueue: runtime.orderQueue,
+        currentOrder: nextCurrent,
+        orderQueue: restoredQueue,
         satisfaction: runtime.satisfaction,
         phase: 'intro_door',
         phaseBeforeShop: null
@@ -929,10 +1000,7 @@ export const useGameStore = create<GameState>((set, get) => ({
       isCompleted: false
     };
 
-    const queue: Order[] = [];
-    while (queue.length < QUEUE_SIZE) {
-      queue.push(buildOrder(allWords, wordProgressMap, businessDay.pendingCorrectionWordIds));
-    }
+    const queue = fillQueueToSize([], allWords, wordProgressMap, businessDay.pendingCorrectionWordIds);
 
     const nextCoins: CoinWallet = {
       ...coins,
@@ -976,7 +1044,13 @@ export const useGameStore = create<GameState>((set, get) => ({
       return;
     }
 
-    const nextOrder = buildOrder(allWords, wordProgressMap, businessDay.pendingCorrectionWordIds);
+    const prevName = orderQueue[orderQueue.length - 1]?.customer.name;
+    const nextOrder = buildOrderAvoidingSameCustomer(
+      allWords,
+      wordProgressMap,
+      businessDay.pendingCorrectionWordIds,
+      prevName
+    );
 
     const nextQueue = [...orderQueue, nextOrder];
     set({ orderQueue: nextQueue });
@@ -1451,11 +1525,19 @@ export const useGameStore = create<GameState>((set, get) => ({
       // Manual continue is handled by Enter or explicit button; calling this is fine.
     }
 
-    const nextQueue = [...orderQueue.slice(1)];
-
-    while (nextQueue.length < QUEUE_SIZE) {
-      nextQueue.push(buildOrder(allWords, wordProgressMap, businessDay.pendingCorrectionWordIds));
-    }
+    const shiftedQueue = [...orderQueue.slice(1)];
+    const normalizedQueue = normalizeQueueNoAdjacentSameCustomer(
+      shiftedQueue,
+      allWords,
+      wordProgressMap,
+      businessDay.pendingCorrectionWordIds
+    );
+    const nextQueue = fillQueueToSize(
+      normalizedQueue,
+      allWords,
+      wordProgressMap,
+      businessDay.pendingCorrectionWordIds
+    );
 
     const nextCurrent = nextQueue[0] ?? null;
 

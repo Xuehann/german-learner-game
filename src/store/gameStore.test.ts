@@ -108,6 +108,25 @@ describe('dynamic day goal helpers', () => {
   });
 });
 
+describe('customer queue behavior', () => {
+  beforeEach(() => {
+    window.localStorage.clear();
+    useGameStore.getState().resetAllLocalData();
+  });
+
+  it('keeps queue size at 5 and avoids same customer between current and first preview', () => {
+    const state = useGameStore.getState();
+    const queue = state.orderQueue;
+
+    expect(queue).toHaveLength(5);
+    expect(queue[0]?.id).toBe(state.currentOrder?.id);
+
+    const currentName = queue[0]?.customer.name;
+    const firstPreviewName = queue[1]?.customer.name;
+    expect(firstPreviewName).not.toBe(currentName);
+  });
+});
+
 describe('mastery feedback messaging', () => {
   beforeEach(() => {
     window.localStorage.clear();

@@ -65,34 +65,32 @@ const skinPalette = (skin: SausageSkin | null) => {
 };
 
 const CUSTOMER_PORTRAITS: Record<string, string> = {
-  Anna: '/images/customers/anna.webp',
-  Lukas: '/images/customers/lukas.webp',
-  Mia: '/images/customers/mia.webp',
-  Jonas: '/images/customers/jonas.webp',
-  Lea: '/images/customers/lea.webp',
-  Noah: '/images/customers/noah.webp',
-  Emma: '/images/customers/emma.webp',
-  Paul: '/images/customers/paul.webp'
+  Bär: '/images/customers/bar.webp',
+  Hund: '/images/customers/hund.webp',
+  Fuchs: '/images/customers/Fuchs.webp',
+  Igel: '/images/customers/Igel.webp',
+  Eule: '/images/customers/Eule.webp',
 };
 
 const DEFAULT_CUSTOMER_PORTRAIT = '/images/customers/default.webp';
 const IDLE_CUSTOMER_SPEECH = 'Ich warte auf meine Bestellung.';
-const EMPTY_QUEUE_SPEECH = 'Naechster, bitte.';
 
-function CustomerPortrait({ customer }: { customer: Customer | null }) {
+type CustomerPortraitSize = 'full' | 'compact' | 'mini' | 'preview';
+
+function CustomerPortrait({ customer, size = 'full' }: { customer: Customer; size?: CustomerPortraitSize }) {
   const [fallbackStage, setFallbackStage] = useState<'primary' | 'default' | 'emoji'>('primary');
+  const frameClass =
+    size === 'mini'
+      ? 'h-14 w-11 sm:h-16 sm:w-12'
+      : size === 'preview'
+        ? 'h-20 w-full sm:h-24'
+      : size === 'compact'
+        ? 'h-[84px] w-[66px] sm:h-[96px] sm:w-[74px] lg:h-[104px] lg:w-[82px]'
+        : 'h-[112px] w-[86px] sm:h-[132px] sm:w-[102px] lg:h-[156px] lg:w-[118px]';
 
   useEffect(() => {
     setFallbackStage('primary');
-  }, [customer?.id]);
-
-  if (!customer) {
-    return (
-      <div className="flex h-[112px] w-[86px] items-center justify-center rounded border border-[#866443] bg-[#f5e6d4] text-xs text-[#6a4a2d] sm:h-[132px] sm:w-[102px] lg:h-[156px] lg:w-[118px]">
-        无顾客
-      </div>
-    );
-  }
+  }, [customer.id]);
 
   const namedPortrait = CUSTOMER_PORTRAITS[customer.name];
   const src =
@@ -104,14 +102,18 @@ function CustomerPortrait({ customer }: { customer: Customer | null }) {
 
   if (!src) {
     return (
-      <div className="flex h-[112px] w-[86px] items-center justify-center rounded border border-[#866443] bg-[#f5e6d4] text-4xl sm:h-[132px] sm:w-[102px] lg:h-[156px] lg:w-[118px]">
+      <div
+        className={`flex items-center justify-center rounded border border-[#866443] bg-transparent ${
+          size === 'mini' ? 'text-base sm:text-lg' : 'text-3xl sm:text-4xl'
+        } ${frameClass}`}
+      >
         {customer.avatar}
       </div>
     );
   }
 
   return (
-    <div className="h-[112px] w-[86px] overflow-hidden rounded border border-[#866443] bg-[#f5e6d4] sm:h-[132px] sm:w-[102px] lg:h-[156px] lg:w-[118px]">
+    <div className={`overflow-hidden rounded border border-[#866443] bg-transparent ${frameClass}`}>
       <img
         src={src}
         alt={`${customer.name} portrait`}
@@ -196,7 +198,7 @@ export function GamePage() {
   const planDaysLeft = businessDay?.planDaysLeft ?? livePlanProgress.daysLeft;
   const planPoolSize = businessDay?.planPoolSize ?? learningPool.length;
   const currentCustomer = currentOrder?.customer ?? null;
-  const customerSpeech = feedback?.speech ?? (currentCustomer ? IDLE_CUSTOMER_SPEECH : EMPTY_QUEUE_SPEECH);
+  const customerSpeech = feedback?.speech ?? IDLE_CUSTOMER_SPEECH;
 
   const masteredPct =
     goal.newMasteredTarget <= 0
@@ -553,21 +555,25 @@ export function GamePage() {
                 <h2 className="mb-2 text-lg font-semibold text-[#2f2114]">顾客预告</h2>
                 <div className="space-y-2">
                   {orderQueue.slice(1).map((order, idx) => (
-                    <article
-                      key={order.id}
-                      className="rounded border-2 border-[#8a6640] bg-[#fff4e4] px-3 py-2 text-sm"
-                    >
-                      <p className="font-semibold text-[#3a2817]">
-                        #{idx + 1} {order.customer.avatar} {order.customer.name}
-                      </p>
-                      <p className="mt-1 text-xs text-[#3f2c1b]">{order.prompt}</p>
+                    <article key={order.id} className="rounded border-2 border-[#8a6640] bg-[#fff4e4] px-3 py-2 text-sm">
+                      <div className="grid grid-cols-[48%_1fr] items-start gap-2">
+                        <div className="min-w-0">
+                          <CustomerPortrait customer={order.customer} size="preview" />
+                        </div>
+                        <div className="min-w-0">
+                          <p className="font-semibold text-[#3a2817]">
+                            #{idx + 1} {order.customer.name}
+                          </p>
+                          <p className="mt-1 text-xs text-[#3f2c1b]">{order.prompt}</p>
+                        </div>
+                      </div>
                     </article>
                   ))}
                 </div>
               </section>
 
               <section className="rounded-lg border-4 border-[#4b3018] bg-[#fbe9cf] p-4 shadow-[0_5px_0_#7e5a34]">
-                <div className="mb-3 rounded border-2 border-[#7d5a37] bg-[#fff6e7] p-3">
+                <div className="mb-3 rounded border-2 border-[#7d5a37] bg-[#fff6e7] p-2.5 sm:p-3">
                   <p className="text-xs uppercase tracking-wide text-[#6a4a2d]">当前顾客</p>
                   <motion.div
                     key={currentOrder?.id ?? 'none'}
@@ -576,16 +582,28 @@ export function GamePage() {
                     transition={{ duration: 0.35 }}
                     className="mt-1"
                   >
-                    <p className="text-lg font-semibold text-[#2f2012]">{currentCustomer ? currentCustomer.name : '等待顾客...'}</p>
-                    <div className="mt-2 flex items-end gap-3">
-                      <CustomerPortrait customer={currentCustomer} />
-                      <div className="relative max-w-[320px] rounded-lg border-2 border-[#7f5d3a] bg-[#fff7ea] px-3 py-2 text-sm text-[#2f2012] shadow-[0_2px_0_#c9a77f]">
-                        <span className="pointer-events-none absolute -left-[7px] bottom-5 h-3 w-3 rotate-45 border-b-2 border-l-2 border-[#7f5d3a] bg-[#fff7ea]" />
-                        <p className="font-semibold">{customerSpeech}</p>
+                    {currentCustomer ? (
+                      <div className="flex flex-col gap-2 sm:flex-row sm:items-start sm:gap-2.5">
+                        <div className="shrink-0">
+                          <CustomerPortrait customer={currentCustomer} size="compact" />
+                        </div>
+                        <div className="min-w-0 flex-1">
+                          <p className="text-base font-semibold text-[#2f2012] sm:text-lg">{currentCustomer.name}</p>
+                          <div className="relative mt-1 w-full rounded-lg border-2 border-[#7f5d3a] bg-[#fff7ea] px-2.5 py-2 text-sm text-[#2f2012] shadow-[0_2px_0_#c9a77f] sm:px-3">
+                            <span className="pointer-events-none absolute -left-[7px] top-4 hidden h-3 w-3 rotate-45 border-b-2 border-l-2 border-[#7f5d3a] bg-[#fff7ea] sm:block" />
+                            <p className="font-semibold leading-tight">{customerSpeech}</p>
+                            {currentOrder?.prompt && (
+                              <p className="mt-1 text-xs leading-snug text-[#5b4128]">{currentOrder.prompt}</p>
+                            )}
+                            {currentOrder?.instruction && (
+                              <p className="mt-1 text-[11px] leading-snug text-[#6a4a2d]">{currentOrder.instruction}</p>
+                            )}
+                          </div>
+                        </div>
                       </div>
-                    </div>
-                    <p className="text-sm text-[#5b4128]">{currentOrder?.prompt ?? ''}</p>
-                    <p className="text-xs text-[#6a4a2d]">{currentOrder?.instruction ?? ''}</p>
+                    ) : (
+                      <p className="text-sm font-semibold text-[#3a2817]">等待顾客...</p>
+                    )}
                   </motion.div>
                 </div>
 
