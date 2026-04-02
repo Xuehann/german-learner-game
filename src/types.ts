@@ -74,6 +74,10 @@ export interface BusinessDay {
   goal: DayGoal;
   progress: DayProgress;
   pendingCorrectionWordIds: string[];
+  planDayIndex: number;
+  planDaysLeft: number;
+  planPoolSize: number;
+  goalComputedAt: string;
   isCompleted: boolean;
 }
 
@@ -131,7 +135,13 @@ export interface GameAnswer {
   feedbackType: 'correct' | 'wrong' | 'skip';
 }
 
-export type GamePhase = 'serving_order' | 'show_order_feedback' | 'day_summary';
+export type GamePhase =
+  | 'intro_door'
+  | 'intro_goal'
+  | 'serving_order'
+  | 'show_order_feedback'
+  | 'shop'
+  | 'day_summary';
 
 export interface GameFeedback {
   type: 'correct' | 'wrong' | 'skip';
@@ -143,8 +153,12 @@ export interface GameFeedback {
 }
 
 export interface GameSettings {
-  difficulty: Difficulty | 'mixed';
+  difficulty?: Difficulty | 'mixed';
   feedbackDelayMs: number;
+  planDays: number;
+  planStartDate: string;
+  planSource: 'imported_only';
+  lastIntroDate?: string;
 }
 
 export interface ImportValidationError {
@@ -163,4 +177,6 @@ export interface BusinessRuntimeSnapshot {
   orderQueue: Order[];
   currentOrder: Order | null;
   satisfaction: SatisfactionState;
+  phase?: GamePhase;
+  phaseBeforeShop?: GamePhase | null;
 }

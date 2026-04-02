@@ -17,13 +17,15 @@ import {
   saveGameSettings,
   saveRuntimeSnapshot,
   saveSausageCollection,
-  saveWordProgressMap
+  saveWordProgressMap,
+  storageKeyMap
 } from '../lib/storage';
 import { commitWords, parseJsonWords, validateWords } from '../lib/wordImport';
 import type {
   BusinessDay,
   CoinWallet,
   Customer,
+  DayGoal,
   DayProgress,
   Difficulty,
   GameAnswer,
@@ -41,9 +43,52 @@ import type {
   WordProgress
 } from '../types';
 
+const DAY_MS = 24 * 60 * 60 * 1000;
+
+const startOfLocalDay = (date: Date): Date =>
+  new Date(date.getFullYear(), date.getMonth(), date.getDate());
+
+const toLocalDateKey = (date: Date): string => {
+  const y = date.getFullYear();
+  const m = String(date.getMonth() + 1).padStart(2, '0');
+  const d = String(date.getDate()).padStart(2, '0');
+  return `${y}-${m}-${d}`;
+};
+
+const normalizePlanStartDate = (value?: string): string => {
+  if (value) {
+    const parsed = new Date(value);
+    if (!Number.isNaN(parsed.getTime())) {
+      return startOfLocalDay(parsed).toISOString();
+    }
+  }
+
+  return startOfLocalDay(new Date()).toISOString();
+};
+
 const DEFAULT_SETTINGS: GameSettings = {
   difficulty: 'mixed',
-  feedbackDelayMs: 1200
+  feedbackDelayMs: 1200,
+  planDays: 7,
+  planStartDate: normalizePlanStartDate(),
+  planSource: 'imported_only',
+  lastIntroDate: undefined
+};
+
+const normalizeSettings = (raw: GameSettings): GameSettings => {
+  const merged: GameSettings = {
+    ...DEFAULT_SETTINGS,
+    ...raw,
+    planSource: 'imported_only'
+  };
+
+  return {
+    ...merged,
+    difficulty: merged.difficulty ?? 'mixed',
+    feedbackDelayMs: Math.max(300, Math.round(merged.feedbackDelayMs)),
+    planDays: Math.max(1, Math.round(merged.planDays)),
+    planStartDate: normalizePlanStartDate(merged.planStartDate)
+  };
 };
 
 const DEFAULT_SATISFACTION: SatisfactionState = {
@@ -137,6 +182,70 @@ const mergeWords = (builtins: Word[], imported: Word[]): Word[] => {
   return Array.from(map.values());
 };
 
+export const resolveLearningPool = (allWords: Word[]): Word[] => {
+  const imported = allWords.filter((word) => word.sourceType === 'imported');
+  if (imported.length > 0) {
+    return imported;
+  }
+
+  const fallbackA1 = allWords.filter((word) => word.difficulty === 'A1');
+  return fallbackA1.length > 0 ? fallbackA1 : allWords;
+};
+
+const parsePlanStartDate = (planStartDate: string): Date => {
+  const parsed = new Date(planStartDate);
+  if (Number.isNaN(parsed.getTime())) {
+    return startOfLocalDay(new Date());
+  }
+
+  return startOfLocalDay(parsed);
+};
+
+export const getPlanProgress = (
+  planStartDate: string,
+  planDays: number,
+  now: Date = new Date()
+): { dayIndex: number; daysLeft: number } => {
+  const normalizedDays = Math.max(1, Math.round(planDays));
+  const start = parsePlanStartDate(planStartDate);
+  const today = startOfLocalDay(now);
+
+  if (today.getTime() < start.getTime()) {
+    return {
+      dayIndex: 1,
+      daysLeft: normalizedDays
+    };
+  }
+
+  const elapsedDays = Math.floor((today.getTime() - start.getTime()) / DAY_MS);
+  return {
+    dayIndex: Math.min(normalizedDays, elapsedDays + 1),
+    daysLeft: Math.max(1, normalizedDays - elapsedDays)
+  };
+};
+
+export const countRemainingUnmastered = (
+  pool: Word[],
+  progressMap: Record<string, WordProgress>
+): number => {
+  return pool.filter((word) => (progressMap[word.id]?.masteryLevel ?? 0) < 3).length;
+};
+
+export const buildDynamicDayGoal = (
+  remainingUnmastered: number,
+  pendingCorrectionCount: number,
+  remainingDays: number
+): DayGoal => {
+  const days = Math.max(1, remainingDays);
+
+  return {
+    newMasteredTarget:
+      remainingUnmastered <= 0 ? 0 : Math.ceil(remainingUnmastered / days),
+    correctedMistakesTarget:
+      pendingCorrectionCount <= 0 ? 0 : Math.ceil(pendingCorrectionCount / days)
+  };
+};
+
 const isDueForReview = (progress?: WordProgress): boolean => {
   if (!progress) {
     return true;
@@ -176,7 +285,7 @@ const weightedPickWord = (
     }
   }
 
-  return scored[scored.length - 1]?.word ?? words[0] as Word;
+  return scored[scored.length - 1]?.word ?? (words[0] as Word);
 };
 
 const buildCustomer = (): Customer => {
@@ -214,7 +323,7 @@ const buildTranslationOrder = (word: Word, type: OrderType): Omit<Order, 'id' | 
       pastTense: word.pastTense
     }
   ],
-  prompt: `顾客要点单：${word.english}`,
+  prompt: `顾客点单：${word.english}`,
   instruction: '请输入完整德语拼写（含冠词时请一起输入）。'
 });
 
@@ -236,7 +345,7 @@ const buildComboOrder = (first: Word, second: Word): Omit<Order, 'id' | 'custome
       pastTense: second.pastTense
     }
   ],
-  prompt: `组合连单：${first.english} + ${second.english}`,
+  prompt: `顾客点两份：${first.english} + ${second.english}`,
   instruction: '请用逗号分隔输入两个德语答案。'
 });
 
@@ -262,7 +371,7 @@ const evaluateOrder = (order: Order, rawInput: string): { isCorrect: boolean; no
       .filter(Boolean);
 
     if (pieces.length < 2) {
-      return { isCorrect: false, note: '组合单需要两个答案，并用逗号分隔。' };
+      return { isCorrect: false, note: '该订单需要两个答案，并用逗号分隔。' };
     }
 
     const first = order.lines[0];
@@ -330,15 +439,6 @@ const updateWordProgressEntry = (
   };
 };
 
-const safeWordPool = (allWords: Word[], difficulty: Difficulty | 'mixed'): Word[] => {
-  if (difficulty === 'mixed') {
-    return allWords;
-  }
-
-  const filtered = allWords.filter((word) => word.difficulty === difficulty);
-  return filtered.length > 0 ? filtered : allWords;
-};
-
 const hasLegacyArticleOrder = (runtime: {
   orderQueue: Array<{ type?: string }>;
   currentOrder: { type?: string } | null;
@@ -350,14 +450,29 @@ const hasLegacyArticleOrder = (runtime: {
   return runtime.orderQueue.some((order) => order.type === 'article');
 };
 
+const RUNTIME_PHASES: GamePhase[] = [
+  'intro_door',
+  'intro_goal',
+  'serving_order',
+  'show_order_feedback',
+  'shop'
+];
+
+const normalizeRuntimePhase = (phase: unknown): GamePhase => {
+  if (typeof phase === 'string' && RUNTIME_PHASES.includes(phase as GamePhase)) {
+    return phase as GamePhase;
+  }
+
+  return 'serving_order';
+};
+
 const buildOrder = (
   allWords: Word[],
-  difficulty: Difficulty | 'mixed',
   progressMap: Record<string, WordProgress>,
   pendingCorrectionWordIds: string[]
 ): Order => {
   const customer = buildCustomer();
-  const pool = safeWordPool(allWords, difficulty);
+  const pool = resolveLearningPool(allWords);
   const orderType = chooseOrderType(pendingCorrectionWordIds.length > 0);
 
   if (orderType === 'review' && pendingCorrectionWordIds.length > 0) {
@@ -372,8 +487,7 @@ const buildOrder = (
     return {
       id: buildOrderId(),
       customer,
-      ...base,
-      prompt: `错词回炉：${picked.english}`
+      ...base
     };
   }
 
@@ -401,6 +515,7 @@ interface GameState {
   isInitialized: boolean;
   allWords: Word[];
   phase: GamePhase;
+  phaseBeforeShop: GamePhase | null;
   currentOrder: Order | null;
   orderQueue: Order[];
   businessDay: BusinessDay | null;
@@ -417,6 +532,11 @@ interface GameState {
   initializeGame: () => void;
   startBusinessDay: () => void;
   generateOrder: () => void;
+  advanceIntro: () => void;
+  skipIntro: () => void;
+  openShop: () => void;
+  closeShop: () => void;
+  applyPlanAdjustmentAndStartNextDay: (remainingDays: number) => void;
   setInput: (value: string) => void;
   appendSpecialChar: (char: string) => void;
   submitOrderAnswer: () => void;
@@ -427,16 +547,42 @@ interface GameState {
   completeDayIfGoalMet: () => boolean;
   redeemSausage: (skinId: string) => void;
   setDisplaySausage: (skinId: string) => void;
+  resetAllLocalData: () => void;
   updateSettings: (patch: Partial<GameSettings>) => void;
   importWordsFromJsonText: (raw: string) => void;
   clearImportReport: () => void;
 }
+
+const hydrateBusinessDay = (
+  day: BusinessDay,
+  settings: GameSettings,
+  allWords: Word[]
+): BusinessDay => {
+  const plan = getPlanProgress(settings.planStartDate, settings.planDays);
+  const poolSize = resolveLearningPool(allWords).length;
+
+  return {
+    ...day,
+    planDayIndex:
+      Number.isFinite(day.planDayIndex) && day.planDayIndex > 0 ? day.planDayIndex : plan.dayIndex,
+    planDaysLeft:
+      Number.isFinite(day.planDaysLeft) && day.planDaysLeft > 0 ? day.planDaysLeft : plan.daysLeft,
+    planPoolSize:
+      Number.isFinite(day.planPoolSize) && day.planPoolSize > 0 ? day.planPoolSize : poolSize,
+    goalComputedAt:
+      typeof day.goalComputedAt === 'string' && day.goalComputedAt.length > 0
+        ? day.goalComputedAt
+        : new Date().toISOString()
+  };
+};
 
 const persistRuntimeFromState = (state: {
   businessDay: BusinessDay | null;
   orderQueue: Order[];
   currentOrder: Order | null;
   satisfaction: SatisfactionState;
+  phase: GamePhase;
+  phaseBeforeShop: GamePhase | null;
 }) => {
   if (!state.businessDay || state.businessDay.isCompleted) {
     clearRuntimeSnapshot();
@@ -447,7 +593,9 @@ const persistRuntimeFromState = (state: {
     businessDay: state.businessDay,
     orderQueue: state.orderQueue,
     currentOrder: state.currentOrder,
-    satisfaction: state.satisfaction
+    satisfaction: state.satisfaction,
+    phase: state.phase,
+    phaseBeforeShop: state.phaseBeforeShop
   });
 };
 
@@ -455,6 +603,7 @@ export const useGameStore = create<GameState>((set, get) => ({
   isInitialized: false,
   allWords: DEFAULT_WORDS,
   phase: 'serving_order',
+  phaseBeforeShop: null,
   currentOrder: null,
   orderQueue: [],
   businessDay: null,
@@ -472,17 +621,32 @@ export const useGameStore = create<GameState>((set, get) => ({
   initializeGame: () => {
     const imported = loadImportedWords();
     const mergedWords = mergeWords(DEFAULT_WORDS, imported);
-    const settings = loadGameSettings(DEFAULT_SETTINGS);
+    const rawSettings = loadGameSettings(DEFAULT_SETTINGS);
+    const settings = normalizeSettings(rawSettings);
     const wordProgressMap = loadWordProgressMap();
     const coins = loadCoinWallet(DEFAULT_WALLET);
     const collection = loadSausageCollection(DEFAULT_COLLECTION);
     const runtime = loadRuntimeSnapshot();
+    const todayKey = toLocalDateKey(new Date());
+    const shouldPlayIntroToday = settings.lastIntroDate !== todayKey;
+    const nextSettings = shouldPlayIntroToday
+      ? {
+          ...settings,
+          lastIntroDate: todayKey
+        }
+      : settings;
 
     if (runtime && !runtime.businessDay.isCompleted && !hasLegacyArticleOrder(runtime)) {
+      const phase = shouldPlayIntroToday ? 'intro_door' : normalizeRuntimePhase(runtime.phase);
+      const phaseBeforeShop = runtime.phaseBeforeShop
+        ? normalizeRuntimePhase(runtime.phaseBeforeShop)
+        : null;
+      const hydratedDay = hydrateBusinessDay(runtime.businessDay, settings, mergedWords);
+
       set({
         isInitialized: true,
         allWords: mergedWords,
-        settings,
+        settings: nextSettings,
         wordProgressMap,
         coins: {
           ...coins,
@@ -490,13 +654,26 @@ export const useGameStore = create<GameState>((set, get) => ({
           spentToday: 0
         },
         collection,
-        businessDay: runtime.businessDay,
+        businessDay: hydratedDay,
         orderQueue: runtime.orderQueue,
         currentOrder: runtime.currentOrder,
         satisfaction: runtime.satisfaction,
-        phase: 'serving_order',
+        phase,
+        phaseBeforeShop,
         orderStartedAtMs: Date.now()
       });
+
+      saveGameSettings(nextSettings);
+      if (shouldPlayIntroToday) {
+        persistRuntimeFromState({
+          businessDay: hydratedDay,
+          currentOrder: runtime.currentOrder,
+          orderQueue: runtime.orderQueue,
+          satisfaction: runtime.satisfaction,
+          phase: 'intro_door',
+          phaseBeforeShop: null
+        });
+      }
       return;
     }
 
@@ -507,35 +684,47 @@ export const useGameStore = create<GameState>((set, get) => ({
     set({
       isInitialized: true,
       allWords: mergedWords,
-      settings,
+      settings: nextSettings,
       wordProgressMap,
       coins,
       collection
     });
 
+    saveGameSettings(nextSettings);
     get().startBusinessDay();
   },
 
   startBusinessDay: () => {
-    const { allWords, settings, wordProgressMap, coins } = get();
+    const { allWords, settings, wordProgressMap, coins, businessDay: previousDay } = get();
+    const pool = resolveLearningPool(allWords);
+    const planProgress = getPlanProgress(settings.planStartDate, settings.planDays);
+    const remainingUnmastered = countRemainingUnmastered(pool, wordProgressMap);
+    const carryPending = Array.from(new Set(previousDay?.pendingCorrectionWordIds ?? [])).filter((wordId) =>
+      pool.some((word) => word.id === wordId)
+    );
+    const goal = buildDynamicDayGoal(remainingUnmastered, carryPending.length, planProgress.daysLeft);
 
     const businessDay: BusinessDay = {
       id: buildDayId(),
       startedAt: new Date().toISOString(),
-      goal: DEFAULT_DAY_GOAL,
+      goal,
       progress: {
         newMastered: 0,
         correctedMistakes: 0,
         servedOrders: 0,
         correctOrders: 0
       },
-      pendingCorrectionWordIds: [],
+      pendingCorrectionWordIds: carryPending,
+      planDayIndex: planProgress.dayIndex,
+      planDaysLeft: planProgress.daysLeft,
+      planPoolSize: pool.length,
+      goalComputedAt: new Date().toISOString(),
       isCompleted: false
     };
 
     const queue: Order[] = [];
     while (queue.length < QUEUE_SIZE) {
-      queue.push(buildOrder(allWords, settings.difficulty, wordProgressMap, businessDay.pendingCorrectionWordIds));
+      queue.push(buildOrder(allWords, wordProgressMap, businessDay.pendingCorrectionWordIds));
     }
 
     const nextCoins: CoinWallet = {
@@ -544,9 +733,21 @@ export const useGameStore = create<GameState>((set, get) => ({
       spentToday: 0
     };
 
+    const todayKey = toLocalDateKey(new Date());
+    const shouldPlayIntro = settings.lastIntroDate !== todayKey;
+    const nextPhase: GamePhase = shouldPlayIntro ? 'intro_door' : 'serving_order';
+
+    const nextSettings = shouldPlayIntro
+      ? {
+          ...settings,
+          lastIntroDate: todayKey
+        }
+      : settings;
+
     set({
       businessDay,
-      phase: 'serving_order',
+      phase: nextPhase,
+      phaseBeforeShop: null,
       currentOrder: queue[0] ?? null,
       orderQueue: queue,
       feedback: null,
@@ -554,30 +755,30 @@ export const useGameStore = create<GameState>((set, get) => ({
       orderStartedAtMs: Date.now(),
       answers: [],
       satisfaction: DEFAULT_SATISFACTION,
-      coins: nextCoins
+      coins: nextCoins,
+      settings: nextSettings
     });
 
     saveCoinWallet(nextCoins);
+    saveGameSettings(nextSettings);
+
     persistRuntimeFromState({
       businessDay,
       currentOrder: queue[0] ?? null,
       orderQueue: queue,
-      satisfaction: DEFAULT_SATISFACTION
+      satisfaction: DEFAULT_SATISFACTION,
+      phase: nextPhase,
+      phaseBeforeShop: null
     });
   },
 
   generateOrder: () => {
-    const { allWords, settings, wordProgressMap, businessDay, orderQueue } = get();
+    const { allWords, wordProgressMap, businessDay, orderQueue, phase, phaseBeforeShop } = get();
     if (!businessDay || businessDay.isCompleted) {
       return;
     }
 
-    const nextOrder = buildOrder(
-      allWords,
-      settings.difficulty,
-      wordProgressMap,
-      businessDay.pendingCorrectionWordIds
-    );
+    const nextOrder = buildOrder(allWords, wordProgressMap, businessDay.pendingCorrectionWordIds);
 
     const nextQueue = [...orderQueue, nextOrder];
     set({ orderQueue: nextQueue });
@@ -586,8 +787,101 @@ export const useGameStore = create<GameState>((set, get) => ({
       businessDay,
       currentOrder: get().currentOrder,
       orderQueue: nextQueue,
-      satisfaction: get().satisfaction
+      satisfaction: get().satisfaction,
+      phase,
+      phaseBeforeShop
     });
+  },
+
+  advanceIntro: () => {
+    const { phase, businessDay, orderQueue, currentOrder, satisfaction, phaseBeforeShop } = get();
+    if (!businessDay) {
+      return;
+    }
+
+    const nextPhase: GamePhase = phase === 'intro_door' ? 'intro_goal' : 'serving_order';
+
+    set({ phase: nextPhase });
+
+    persistRuntimeFromState({
+      businessDay,
+      currentOrder,
+      orderQueue,
+      satisfaction,
+      phase: nextPhase,
+      phaseBeforeShop
+    });
+  },
+
+  skipIntro: () => {
+    const { phase } = get();
+    if (phase === 'intro_door' || phase === 'intro_goal') {
+      get().advanceIntro();
+    }
+  },
+
+  openShop: () => {
+    const { phase, businessDay, orderQueue, currentOrder, satisfaction } = get();
+    if (!businessDay || businessDay.isCompleted || phase === 'shop') {
+      return;
+    }
+
+    if (phase === 'day_summary' || phase === 'intro_door') {
+      return;
+    }
+
+    set({
+      phase: 'shop',
+      phaseBeforeShop: phase
+    });
+
+    persistRuntimeFromState({
+      businessDay,
+      currentOrder,
+      orderQueue,
+      satisfaction,
+      phase: 'shop',
+      phaseBeforeShop: phase
+    });
+  },
+
+  closeShop: () => {
+    const { phaseBeforeShop, businessDay, orderQueue, currentOrder, satisfaction } = get();
+    if (!businessDay || businessDay.isCompleted) {
+      return;
+    }
+
+    const nextPhase = phaseBeforeShop ?? 'serving_order';
+    set({
+      phase: nextPhase,
+      phaseBeforeShop: null
+    });
+
+    persistRuntimeFromState({
+      businessDay,
+      currentOrder,
+      orderQueue,
+      satisfaction,
+      phase: nextPhase,
+      phaseBeforeShop: null
+    });
+  },
+
+  applyPlanAdjustmentAndStartNextDay: (remainingDays) => {
+    const normalizedDays = Math.max(1, Math.round(remainingDays));
+    const tomorrow = startOfLocalDay(new Date());
+    tomorrow.setDate(tomorrow.getDate() + 1);
+
+    const nextSettings = normalizeSettings({
+      ...get().settings,
+      planDays: normalizedDays,
+      planStartDate: tomorrow.toISOString(),
+      planSource: 'imported_only'
+    });
+
+    saveGameSettings(nextSettings);
+    set({ settings: nextSettings });
+    get().startBusinessDay();
   },
 
   setInput: (value) => set({ currentInput: value }),
@@ -598,7 +892,7 @@ export const useGameStore = create<GameState>((set, get) => ({
   },
 
   updateSatisfaction: (delta) => {
-    const { satisfaction, businessDay, orderQueue, currentOrder } = get();
+    const { satisfaction, businessDay, orderQueue, currentOrder, phase, phaseBeforeShop } = get();
     const nextSatisfaction: SatisfactionState = {
       ...satisfaction,
       current: clamp(satisfaction.current + delta, satisfaction.min, satisfaction.max)
@@ -610,7 +904,9 @@ export const useGameStore = create<GameState>((set, get) => ({
       businessDay,
       currentOrder,
       orderQueue,
-      satisfaction: nextSatisfaction
+      satisfaction: nextSatisfaction,
+      phase,
+      phaseBeforeShop
     });
   },
 
@@ -666,7 +962,7 @@ export const useGameStore = create<GameState>((set, get) => ({
       startTime: completedDay.startedAt,
       endTime: completedDay.completedAt,
       gameMode: 'butcher_business',
-      difficulty: settings.difficulty,
+      difficulty: settings.difficulty ?? 'mixed',
       dayGoal: completedDay.goal,
       dayProgress: completedDay.progress,
       accuracy,
@@ -681,6 +977,7 @@ export const useGameStore = create<GameState>((set, get) => ({
     set({
       businessDay: completedDay,
       phase: 'day_summary',
+      phaseBeforeShop: null,
       feedback: null,
       currentInput: '',
       coins: nextCoins
@@ -699,7 +996,8 @@ export const useGameStore = create<GameState>((set, get) => ({
       coins,
       answers,
       orderQueue,
-      satisfaction
+      satisfaction,
+      phaseBeforeShop
     } = get();
 
     if (!businessDay || businessDay.isCompleted || !currentOrder) {
@@ -816,12 +1114,14 @@ export const useGameStore = create<GameState>((set, get) => ({
       businessDay: nextDay,
       currentOrder,
       orderQueue,
-      satisfaction: nextSatisfaction
+      satisfaction: nextSatisfaction,
+      phase: 'show_order_feedback',
+      phaseBeforeShop
     });
   },
 
   skipOrder: () => {
-    const { businessDay, currentOrder, currentInput, answers, satisfaction, orderQueue } = get();
+    const { businessDay, currentOrder, currentInput, answers, satisfaction, orderQueue, phaseBeforeShop } = get();
 
     if (!businessDay || businessDay.isCompleted || !currentOrder) {
       return;
@@ -861,7 +1161,7 @@ export const useGameStore = create<GameState>((set, get) => ({
       title: '你跳过了订单',
       correctAnswer: buildCorrectAnswerText(currentOrder),
       userInput: currentInput,
-      note: '满意度下降，错词已加入回炉池。',
+      note: '满意度下降，已记录待复习词。',
       requiresManualContinue: true
     };
 
@@ -878,12 +1178,14 @@ export const useGameStore = create<GameState>((set, get) => ({
       businessDay: nextDay,
       currentOrder,
       orderQueue,
-      satisfaction: nextSatisfaction
+      satisfaction: nextSatisfaction,
+      phase: 'show_order_feedback',
+      phaseBeforeShop
     });
   },
 
   continueAfterFeedback: () => {
-    const { businessDay, phase, feedback, orderQueue, allWords, settings, wordProgressMap, satisfaction } = get();
+    const { businessDay, phase, feedback, orderQueue, allWords, wordProgressMap, satisfaction } = get();
 
     if (phase !== 'show_order_feedback' || !businessDay || businessDay.isCompleted) {
       return;
@@ -896,9 +1198,7 @@ export const useGameStore = create<GameState>((set, get) => ({
     const nextQueue = [...orderQueue.slice(1)];
 
     while (nextQueue.length < QUEUE_SIZE) {
-      nextQueue.push(
-        buildOrder(allWords, settings.difficulty, wordProgressMap, businessDay.pendingCorrectionWordIds)
-      );
+      nextQueue.push(buildOrder(allWords, wordProgressMap, businessDay.pendingCorrectionWordIds));
     }
 
     const nextCurrent = nextQueue[0] ?? null;
@@ -916,7 +1216,9 @@ export const useGameStore = create<GameState>((set, get) => ({
       businessDay,
       currentOrder: nextCurrent,
       orderQueue: nextQueue,
-      satisfaction
+      satisfaction,
+      phase: 'serving_order',
+      phaseBeforeShop: null
     });
   },
 
@@ -937,7 +1239,7 @@ export const useGameStore = create<GameState>((set, get) => ({
     const nextCollection: SausageCollection = {
       ...collection,
       ownedSkinIds: [...collection.ownedSkinIds, skinId],
-      displaySkinId: collection.displaySkinId ?? skinId
+      displaySkinId: skinId
     };
 
     set({ coins: nextCoins, collection: nextCollection });
@@ -960,11 +1262,54 @@ export const useGameStore = create<GameState>((set, get) => ({
     saveSausageCollection(nextCollection);
   },
 
+  resetAllLocalData: () => {
+    Object.values(storageKeyMap).forEach((key) => {
+      try {
+        localStorage.removeItem(key);
+      } catch {
+        // Ignore browser storage errors.
+      }
+    });
+
+    const nextSettings = normalizeSettings({
+      ...DEFAULT_SETTINGS,
+      lastIntroDate: undefined
+    });
+
+    set({
+      isInitialized: true,
+      allWords: DEFAULT_WORDS,
+      phase: 'serving_order',
+      phaseBeforeShop: null,
+      currentOrder: null,
+      orderQueue: [],
+      businessDay: null,
+      feedback: null,
+      currentInput: '',
+      orderStartedAtMs: Date.now(),
+      answers: [],
+      satisfaction: DEFAULT_SATISFACTION,
+      coins: DEFAULT_WALLET,
+      collection: DEFAULT_COLLECTION,
+      wordProgressMap: {},
+      importReport: null,
+      settings: nextSettings
+    });
+
+    clearRuntimeSnapshot();
+    saveGameSettings(nextSettings);
+    saveCoinWallet(DEFAULT_WALLET);
+    saveSausageCollection(DEFAULT_COLLECTION);
+
+    get().startBusinessDay();
+  },
+
   updateSettings: (patch) => {
-    const nextSettings: GameSettings = {
+    const nextSettings = normalizeSettings({
       ...get().settings,
-      ...patch
-    };
+      ...patch,
+      planSource: 'imported_only'
+    });
 
     saveGameSettings(nextSettings);
     set({ settings: nextSettings });
