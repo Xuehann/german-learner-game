@@ -1,5 +1,11 @@
-import { describe, expect, it } from 'vitest';
-import { buildDynamicDayGoal, countRemainingUnmastered, getPlanProgress, resolveLearningPool } from './gameStore';
+import { beforeEach, describe, expect, it } from 'vitest';
+import {
+  buildDynamicDayGoal,
+  countRemainingUnmastered,
+  getPlanProgress,
+  resolveLearningPool,
+  useGameStore
+} from './gameStore';
 import type { Word, WordProgress } from '../types';
 
 const words: Word[] = [
@@ -91,5 +97,33 @@ describe('dynamic day goal helpers', () => {
 
     const remaining = countRemainingUnmastered(words, progressMap);
     expect(remaining).toBe(2);
+  });
+});
+
+describe('updatePlanDaysForCurrentDay', () => {
+  beforeEach(() => {
+    window.localStorage.clear();
+    useGameStore.getState().resetAllLocalData();
+  });
+
+  it('updates planDays and recomputes current day goal immediately', () => {
+    const before = useGameStore.getState();
+    const beforeDay = before.businessDay;
+
+    expect(beforeDay).not.toBeNull();
+
+    useGameStore.getState().updatePlanDaysForCurrentDay(30);
+
+    const after = useGameStore.getState();
+    const afterDay = after.businessDay;
+
+    expect(after.settings.planDays).toBe(30);
+    expect(afterDay).not.toBeNull();
+    expect(afterDay?.planDaysLeft).toBeGreaterThanOrEqual(beforeDay?.planDaysLeft ?? 1);
+    expect(afterDay?.goalComputedAt).not.toBe(beforeDay?.goalComputedAt);
+
+    const beforeGoal = beforeDay?.goal.newMasteredTarget ?? 0;
+    const afterGoal = afterDay?.goal.newMasteredTarget ?? 0;
+    expect(afterGoal).toBeLessThanOrEqual(beforeGoal);
   });
 });

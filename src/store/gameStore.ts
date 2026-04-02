@@ -581,6 +581,7 @@ interface GameState {
   openShop: () => void;
   closeShop: () => void;
   applyPlanAdjustmentAndStartNextDay: (remainingDays: number) => void;
+  updatePlanDaysForCurrentDay: (days: number) => void;
   setInput: (value: string) => void;
   appendSpecialChar: (char: string) => void;
   submitOrderAnswer: () => void;
@@ -1070,6 +1071,53 @@ export const useGameStore = create<GameState>((set, get) => ({
     saveGameSettings(nextSettings);
     set({ settings: nextSettings });
     get().startBusinessDay();
+  },
+
+  updatePlanDaysForCurrentDay: (days) => {
+    const normalizedDays = Math.max(1, Math.min(30, Math.round(days)));
+    const state = get();
+
+    const nextSettings = normalizeSettings({
+      ...state.settings,
+      planDays: normalizedDays
+    });
+
+    let nextBusinessDay = state.businessDay;
+    if (state.businessDay && !state.businessDay.isCompleted) {
+      const pool = resolveLearningPool(state.allWords);
+      const pendingCorrectionWordIds = Array.from(new Set(state.businessDay.pendingCorrectionWordIds)).filter(
+        (wordId) => pool.some((word) => word.id === wordId)
+      );
+      const planProgress = getPlanProgress(nextSettings.planStartDate, nextSettings.planDays);
+      const remainingUnmastered = countRemainingUnmastered(pool, state.wordProgressMap);
+
+      nextBusinessDay = {
+        ...state.businessDay,
+        goal: buildDynamicDayGoal(remainingUnmastered, pendingCorrectionWordIds.length, planProgress.daysLeft),
+        pendingCorrectionWordIds,
+        planDayIndex: planProgress.dayIndex,
+        planDaysLeft: planProgress.daysLeft,
+        planPoolSize: pool.length,
+        goalComputedAt: new Date().toISOString()
+      };
+    }
+
+    saveGameSettings(nextSettings);
+    set({
+      settings: nextSettings,
+      businessDay: nextBusinessDay
+    });
+
+    if (nextBusinessDay && !nextBusinessDay.isCompleted) {
+      persistRuntimeFromState({
+        businessDay: nextBusinessDay,
+        currentOrder: state.currentOrder,
+        orderQueue: state.orderQueue,
+        satisfaction: state.satisfaction,
+        phase: state.phase,
+        phaseBeforeShop: state.phaseBeforeShop
+      });
+    }
   },
 
   setInput: (value) => set({ currentInput: value }),
