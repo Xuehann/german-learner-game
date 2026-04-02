@@ -11,7 +11,7 @@ import {
   SAUSAGE_CATALOG,
   useGameStore
 } from '../store/gameStore';
-import type { Order, SausageSkin } from '../types';
+import type { Customer, Order, SausageSkin } from '../types';
 
 const splitAnswer = (value: string): string[] => value.trim().split(/\s+/).filter(Boolean);
 
@@ -63,6 +63,67 @@ const skinPalette = (skin: SausageSkin | null) => {
 
   return SKIN_PALETTE[skin.id] ?? SKIN_PALETTE['classic-link'];
 };
+
+const CUSTOMER_PORTRAITS: Record<string, string> = {
+  Anna: '/images/customers/anna.webp',
+  Lukas: '/images/customers/lukas.webp',
+  Mia: '/images/customers/mia.webp',
+  Jonas: '/images/customers/jonas.webp',
+  Lea: '/images/customers/lea.webp',
+  Noah: '/images/customers/noah.webp',
+  Emma: '/images/customers/emma.webp',
+  Paul: '/images/customers/paul.webp'
+};
+
+const DEFAULT_CUSTOMER_PORTRAIT = '/images/customers/default.webp';
+const IDLE_CUSTOMER_SPEECH = 'Ich warte auf meine Bestellung.';
+const EMPTY_QUEUE_SPEECH = 'Naechster, bitte.';
+
+function CustomerPortrait({ customer }: { customer: Customer | null }) {
+  const [fallbackStage, setFallbackStage] = useState<'primary' | 'default' | 'emoji'>('primary');
+
+  useEffect(() => {
+    setFallbackStage('primary');
+  }, [customer?.id]);
+
+  if (!customer) {
+    return (
+      <div className="flex h-[112px] w-[86px] items-center justify-center rounded border border-[#866443] bg-[#f5e6d4] text-xs text-[#6a4a2d] sm:h-[132px] sm:w-[102px] lg:h-[156px] lg:w-[118px]">
+        无顾客
+      </div>
+    );
+  }
+
+  const namedPortrait = CUSTOMER_PORTRAITS[customer.name];
+  const src =
+    fallbackStage === 'primary'
+      ? namedPortrait ?? DEFAULT_CUSTOMER_PORTRAIT
+      : fallbackStage === 'default'
+        ? DEFAULT_CUSTOMER_PORTRAIT
+        : null;
+
+  if (!src) {
+    return (
+      <div className="flex h-[112px] w-[86px] items-center justify-center rounded border border-[#866443] bg-[#f5e6d4] text-4xl sm:h-[132px] sm:w-[102px] lg:h-[156px] lg:w-[118px]">
+        {customer.avatar}
+      </div>
+    );
+  }
+
+  return (
+    <div className="h-[112px] w-[86px] overflow-hidden rounded border border-[#866443] bg-[#f5e6d4] sm:h-[132px] sm:w-[102px] lg:h-[156px] lg:w-[118px]">
+      <img
+        src={src}
+        alt={`${customer.name} portrait`}
+        className="h-full w-full object-contain p-1"
+        style={{ imageRendering: 'pixelated' }}
+        onError={() => {
+          setFallbackStage((prev) => (prev === 'primary' ? 'default' : 'emoji'));
+        }}
+      />
+    </div>
+  );
+}
 
 export function GamePage() {
   const {
@@ -134,6 +195,8 @@ export function GamePage() {
   const planDayIndex = businessDay?.planDayIndex ?? livePlanProgress.dayIndex;
   const planDaysLeft = businessDay?.planDaysLeft ?? livePlanProgress.daysLeft;
   const planPoolSize = businessDay?.planPoolSize ?? learningPool.length;
+  const currentCustomer = currentOrder?.customer ?? null;
+  const customerSpeech = feedback?.speech ?? (currentCustomer ? IDLE_CUSTOMER_SPEECH : EMPTY_QUEUE_SPEECH);
 
   const masteredPct =
     goal.newMasteredTarget <= 0
@@ -513,9 +576,14 @@ export function GamePage() {
                     transition={{ duration: 0.35 }}
                     className="mt-1"
                   >
-                    <p className="text-lg font-semibold text-[#2f2012]">
-                      {currentOrder ? `${currentOrder.customer.avatar} ${currentOrder.customer.name}` : '等待顾客...'}
-                    </p>
+                    <p className="text-lg font-semibold text-[#2f2012]">{currentCustomer ? currentCustomer.name : '等待顾客...'}</p>
+                    <div className="mt-2 flex items-end gap-3">
+                      <CustomerPortrait customer={currentCustomer} />
+                      <div className="relative max-w-[320px] rounded-lg border-2 border-[#7f5d3a] bg-[#fff7ea] px-3 py-2 text-sm text-[#2f2012] shadow-[0_2px_0_#c9a77f]">
+                        <span className="pointer-events-none absolute -left-[7px] bottom-5 h-3 w-3 rotate-45 border-b-2 border-l-2 border-[#7f5d3a] bg-[#fff7ea]" />
+                        <p className="font-semibold">{customerSpeech}</p>
+                      </div>
+                    </div>
                     <p className="text-sm text-[#5b4128]">{currentOrder?.prompt ?? ''}</p>
                     <p className="text-xs text-[#6a4a2d]">{currentOrder?.instruction ?? ''}</p>
                   </motion.div>
@@ -680,13 +748,15 @@ export function GamePage() {
                         ? 'border-[#2d6b3e] bg-[#e9ffdb] text-[#1f4a2b]'
                         : feedback.type === 'wrong'
                           ? 'border-[#8d2a1d] bg-[#ffe3de] text-[#6d2117]'
-                          : 'border-[#6c542f] bg-[#fff1da] text-[#5c4424]'
+                        : 'border-[#6c542f] bg-[#fff1da] text-[#5c4424]'
                     }`}
                   >
-                    <p className="font-semibold">{feedback.title}</p>
+                    <p className="font-semibold">订单纠错信息</p>
+                    <p>{feedback.title}</p>
                     <p>正确答案: {feedback.correctAnswer}</p>
                     <p>你的输入: {feedback.userInput || '(空)'}</p>
                     {feedback.note && <p>提示: {feedback.note}</p>}
+                    {feedback.masteryHint && <p>掌握进度: {feedback.masteryHint}</p>}
                     {feedback.requiresManualContinue && <p className="mt-1 font-semibold">按 Enter 继续下一单</p>}
                   </div>
                 )}
@@ -702,6 +772,7 @@ export function GamePage() {
                     <div className="h-3 rounded bg-[#d9bf9e]">
                       <div className="h-3 rounded bg-[#4a9a61]" style={{ width: `${masteredPct}%` }} />
                     </div>
+                    <p className="text-xs text-[#5f4329]">注: 新增掌握词按 masteryLevel 3 统计。</p>
                     <p>
                       纠正错词: {progress.correctedMistakes} / {goal.correctedMistakesTarget}
                     </p>

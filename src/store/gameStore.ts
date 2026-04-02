@@ -159,6 +159,11 @@ const DEFAULT_COLLECTION: SausageCollection = {
 
 const CUSTOMER_NAMES = ['Anna', 'Lukas', 'Mia', 'Jonas', 'Lea', 'Noah', 'Emma', 'Paul'];
 const CUSTOMER_AVATARS = ['🧑‍🍳', '👨‍🔧', '👩‍💼', '🧔', '👩‍🦰', '🧢'];
+const FEEDBACK_SPEECHES: Record<GameFeedback['type'], string[]> = {
+  correct: ['Gut gemacht!', 'Perfekt!', 'Sehr gut!', 'Ausgezeichnet!'],
+  wrong: ['Das war nicht richtig.', 'Versuch es noch einmal.', 'Fast, aber nicht ganz.', 'Schade, noch mal bitte.'],
+  skip: ['Ich warte dann auf die nächste Bestellung.', 'Alles klar, wir probieren die nächste Runde.', "Kein Problem, weiter geht's."]
+};
 
 const QUEUE_SIZE = 3;
 const DAY_CLEAR_BONUS_COINS = 28;
@@ -173,6 +178,54 @@ const buildUnitId = () => `unit_${Date.now()}_${Math.random().toString(36).slice
 const clamp = (value: number, min: number, max: number): number => Math.max(min, Math.min(max, value));
 
 const pickOne = <T>(items: T[]): T => items[Math.floor(Math.random() * items.length)] as T;
+const pickFeedbackSpeech = (type: GameFeedback['type']): string => pickOne(FEEDBACK_SPEECHES[type]);
+
+const remainingCorrectAnswersToMastery = (progress: Pick<WordProgress, 'attempts' | 'correct'>): number => {
+  const needAttempts = Math.max(0, 2 - progress.attempts);
+  const needAccuracy = Math.max(0, 4 * progress.attempts - 5 * progress.correct);
+  return Math.max(needAttempts, needAccuracy);
+};
+
+const buildMasteryHint = (
+  lineMastery: Array<{ german: string; next: WordProgress; becameMastered: boolean }>,
+  orderType: OrderType,
+  isCorrect: boolean
+): string | undefined => {
+  if (lineMastery.length === 0) {
+    return undefined;
+  }
+
+  const parts = lineMastery.map((item) => {
+    if (item.becameMastered) {
+      return `${item.german} 在本题达到 masteryLevel 3。`;
+    }
+
+    const remaining = remainingCorrectAnswersToMastery(item.next);
+    if (remaining <= 0) {
+      return `${item.german} 当前已是掌握词（masteryLevel 3）。`;
+    }
+
+    return `${item.german} 还差 ${remaining} 次正确作答可达 masteryLevel 3（当前 ${item.next.correct}/${item.next.attempts}）。`;
+  });
+
+  if (orderType !== 'combo') {
+    const first = lineMastery[0];
+    if (!first) {
+      return undefined;
+    }
+
+    if (isCorrect && !first.becameMastered) {
+      const remaining = remainingCorrectAnswersToMastery(first.next);
+      if (remaining > 0) {
+        return `本题答对，但未达掌握阈值。${parts[0] ?? ''}`;
+      }
+    }
+
+    return parts[0];
+  }
+
+  return parts.join('；');
+};
 
 const mergeWords = (builtins: Word[], activeUnitWords: Word[]): Word[] => {
   return [...builtins, ...activeUnitWords];
@@ -1204,6 +1257,7 @@ export const useGameStore = create<GameState>((set, get) => ({
 
     let masteredGain = 0;
     let correctedMistakesGain = 0;
+    const lineMastery: Array<{ german: string; next: WordProgress; becameMastered: boolean }> = [];
 
     currentOrder.lines.forEach((line) => {
       const prev = nextProgressMap[line.wordId];
@@ -1217,6 +1271,12 @@ export const useGameStore = create<GameState>((set, get) => ({
       );
 
       nextProgressMap[line.wordId] = entry.next;
+      lineMastery.push({
+        german: line.german,
+        next: entry.next,
+        becameMastered: entry.becameMastered
+      });
+
       if (entry.becameMastered) {
         masteredGain += 1;
       }
@@ -1257,13 +1317,17 @@ export const useGameStore = create<GameState>((set, get) => ({
 
     const verbPastTenseNote = isCorrect ? buildVerbPastTenseNote(currentOrder) : undefined;
     const mergedNote = [result.note, verbPastTenseNote].filter(Boolean).join('；');
+    const masteryHint = buildMasteryHint(lineMastery, currentOrder.type, isCorrect);
+    const feedbackType: GameFeedback['type'] = isCorrect ? 'correct' : 'wrong';
 
     const feedback: GameFeedback = {
-      type: isCorrect ? 'correct' : 'wrong',
-      title: isCorrect ? '订单完成，顾客很满意' : '订单出错，顾客开始不耐烦',
+      type: feedbackType,
+      title: isCorrect ? '订单判定：正确' : '订单判定：错误',
+      speech: pickFeedbackSpeech(feedbackType),
       correctAnswer: buildCorrectAnswerText(currentOrder),
       userInput: currentInput,
       note: mergedNote || undefined,
+      masteryHint,
       requiresManualContinue: !isCorrect
     };
 
@@ -1348,10 +1412,12 @@ export const useGameStore = create<GameState>((set, get) => ({
 
     const feedback: GameFeedback = {
       type: 'skip',
-      title: '你跳过了订单',
+      title: '订单判定：已跳过',
+      speech: pickFeedbackSpeech('skip'),
       correctAnswer: buildCorrectAnswerText(currentOrder),
       userInput: currentInput,
       note: '满意度下降，已记录待复习词。',
+      masteryHint: '本题已跳过，不计入新增掌握词。',
       requiresManualContinue: true
     };
 
