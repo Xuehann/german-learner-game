@@ -24,18 +24,21 @@ describe('App', () => {
     expect(await screen.findByText('词库中心')).toBeInTheDocument();
   });
 
-  it('shows only 商店（金币兑换）入口 in intro_goal phase', async () => {
+  it('shows only 推门营业 in intro_door and enters intro_goal on click', async () => {
+    const user = userEvent.setup();
     render(<App />);
 
     expect(await screen.findByText('Wortwurst Metzgerei')).toBeInTheDocument();
 
     act(() => {
-      useGameStore.setState({ phase: 'intro_goal' });
+      useGameStore.setState({ phase: 'intro_door' });
     });
 
+    expect(screen.getByRole('button', { name: '推门营业' })).toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: '跳过开门动画' })).not.toBeInTheDocument();
+
+    await user.click(screen.getByRole('button', { name: '推门营业' }));
     expect(screen.getByText('今日运营目标')).toBeInTheDocument();
-    expect(screen.getByRole('button', { name: '商店（金币兑换）' })).toBeInTheDocument();
-    expect(screen.queryByRole('button', { name: '先逛商店' })).not.toBeInTheDocument();
   });
 
   it('navigates between game and units pages', async () => {
