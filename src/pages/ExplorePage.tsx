@@ -197,7 +197,7 @@ export function ExplorePage() {
                   </defs>
                 </svg>
 
-                <div className="absolute inset-0">
+                <div className="pointer-events-none absolute left-[12%] top-[8%] h-[86%] w-[56%]">
                   {cities.map((city) => {
                     const active = city.id === selectedCityId;
                     return (
@@ -206,7 +206,7 @@ export function ExplorePage() {
                         type="button"
                         aria-label={`选择城市 ${city.nameEn}`}
                         onClick={() => void handleCitySelect(city.id)}
-                        className={`group absolute -translate-x-1/2 -translate-y-1/2 rounded-full border-[3px] p-2 text-xl shadow-[0_7px_0_rgba(49,60,53,0.28)] transition hover:-translate-y-[58%] ${
+                        className={`pointer-events-auto group absolute -translate-x-1/2 -translate-y-1/2 rounded-full border-[3px] p-2 text-xl shadow-[0_7px_0_rgba(49,60,53,0.28)] transition hover:-translate-y-[58%] ${
                           active
                             ? 'border-[#fff1cc] bg-[#24493b] text-[#fff6df]'
                             : 'border-[#3f6553] bg-[#fff4df] text-[#20372d]'

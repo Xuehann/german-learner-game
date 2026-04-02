@@ -1,0 +1,18 @@
+<svg width="960" height="640" viewBox="0 0 960 640" fill="none" xmlns="http://www.w3.org/2000/svg">
+  <rect width="960" height="640" rx="40" fill="#E6EEF5"/>
+  <rect x="48" y="48" width="864" height="544" rx="30" fill="url(#sky)"/>
+  <rect x="86" y="400" width="788" height="132" rx="22" fill="#85BF74"/>
+  <rect x="144" y="330" width="120" height="120" rx="14" fill="#C8AA83"/>
+  <rect x="298" y="238" width="170" height="212" rx="16" fill="#D8B995"/>
+  <rect x="504" y="186" width="188" height="264" rx="18" fill="#B77456"/>
+  <rect x="728" y="286" width="92" height="164" rx="12" fill="#D6C4AE"/>
+  <path d="M564 186H632L610 144H586L564 186Z" fill="#8D5B43"/>
+  <path d="M164 400C254 362 360 362 452 400V420H164V400Z" fill="#739E60"/>
+  <text x="132" y="552" fill="#273649" font-size="28" font-family="'Bree Serif', serif">Leipzig • Music heritage, passages, Thomaskirche</text>
+  <defs>
+    <linearGradient id="sky" x1="480" y1="48" x2="480" y2="592" gradientUnits="userSpaceOnUse">
+      <stop stop-color="#DDF2FF"/>
+      <stop offset="1" stop-color="#C3D9F0"/>
+    </linearGradient>
+  </defs>
+</svg>

@@ -1,0 +1,19 @@
+<svg width="960" height="640" viewBox="0 0 960 640" fill="none" xmlns="http://www.w3.org/2000/svg">
+  <rect width="960" height="640" rx="40" fill="#E9EFE0"/>
+  <rect x="48" y="48" width="864" height="544" rx="30" fill="url(#sky)"/>
+  <rect x="78" y="410" width="804" height="128" rx="24" fill="#7AB6D6"/>
+  <rect x="110" y="486" width="748" height="54" rx="16" fill="#76B36D"/>
+  <rect x="170" y="246" width="160" height="186" rx="16" fill="#C8A57B"/>
+  <rect x="360" y="214" width="180" height="218" rx="18" fill="#D8C1A5"/>
+  <rect x="574" y="268" width="168" height="164" rx="16" fill="#C07E5B"/>
+  <path d="M380 214H520L500 174H400L380 214Z" fill="#9A6A4C"/>
+  <path d="M230 246H270V186H250V166H230V246Z" fill="#8A5A42"/>
+  <path d="M640 268H676V214H706V196H640V268Z" fill="#9A6549"/>
+  <text x="132" y="552" fill="#2E3A25" font-size="28" font-family="'Bree Serif', serif">Bremen • Marktplatz, Weser, Hanseatic old town</text>
+  <defs>
+    <linearGradient id="sky" x1="480" y1="48" x2="480" y2="592" gradientUnits="userSpaceOnUse">
+      <stop stop-color="#D8F1FF"/>
+      <stop offset="1" stop-color="#F4D9A9"/>
+    </linearGradient>
+  </defs>
+</svg>

@@ -1,0 +1,19 @@
+<svg width="960" height="640" viewBox="0 0 960 640" fill="none" xmlns="http://www.w3.org/2000/svg">
+  <rect width="960" height="640" rx="40" fill="#F1E7D8"/>
+  <rect x="48" y="48" width="864" height="544" rx="30" fill="url(#sky)"/>
+  <rect x="70" y="430" width="820" height="102" rx="20" fill="#6EAED4"/>
+  <rect x="96" y="494" width="770" height="46" rx="14" fill="#79B567"/>
+  <rect x="156" y="278" width="128" height="154" rx="14" fill="#D5B792"/>
+  <rect x="322" y="212" width="92" height="220" rx="12" fill="#A9B9CA"/>
+  <rect x="438" y="174" width="110" height="258" rx="12" fill="#8EA0B3"/>
+  <rect x="576" y="222" width="132" height="210" rx="14" fill="#AABCCC"/>
+  <rect x="736" y="266" width="88" height="166" rx="12" fill="#C2D0DD"/>
+  <path d="M170 278H270L242 238H198L170 278Z" fill="#A26A49"/>
+  <text x="132" y="552" fill="#4A3122" font-size="28" font-family="'Bree Serif', serif">Frankfurt • Skyline, Main riverbank, Römerberg</text>
+  <defs>
+    <linearGradient id="sky" x1="480" y1="48" x2="480" y2="592" gradientUnits="userSpaceOnUse">
+      <stop stop-color="#D7EDFF"/>
+      <stop offset="1" stop-color="#F5CEA0"/>
+    </linearGradient>
+  </defs>
+</svg>
