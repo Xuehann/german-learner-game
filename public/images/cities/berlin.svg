@@ -1,0 +1,22 @@
+<svg width="960" height="640" viewBox="0 0 960 640" fill="none" xmlns="http://www.w3.org/2000/svg">
+  <rect width="960" height="640" rx="40" fill="#F8E7C1"/>
+  <rect x="48" y="48" width="864" height="544" rx="30" fill="url(#sky)"/>
+  <rect x="90" y="360" width="780" height="170" rx="24" fill="#9BD07C"/>
+  <rect x="130" y="405" width="90" height="90" rx="10" fill="#EBCB8E"/>
+  <rect x="240" y="380" width="120" height="115" rx="12" fill="#CF7E56"/>
+  <rect x="400" y="300" width="150" height="195" rx="14" fill="#F4EFE4"/>
+  <rect x="450" y="215" width="50" height="115" rx="12" fill="#D2D7E0"/>
+  <rect x="625" y="330" width="180" height="165" rx="14" fill="#B9D0D6"/>
+  <rect x="656" y="295" width="118" height="62" rx="12" fill="#EAEFF6"/>
+  <path d="M431 299H519L503 239H447L431 299Z" fill="#E9C977"/>
+  <path d="M465 170L480 124L495 170H465Z" fill="#2F3340"/>
+  <path d="M640 335H790L755 282H675L640 335Z" fill="#8FA8AE"/>
+  <rect x="110" y="520" width="360" height="36" rx="18" fill="#F7F0DF" fill-opacity="0.94"/>
+  <text x="132" y="544" fill="#3F2A1A" font-size="28" font-family="'Bree Serif', serif">Berlin • Brandenburg Gate &amp; TV Tower</text>
+  <defs>
+    <linearGradient id="sky" x1="480" y1="48" x2="480" y2="592" gradientUnits="userSpaceOnUse">
+      <stop stop-color="#C9ECFF"/>
+      <stop offset="1" stop-color="#F9D38C"/>
+    </linearGradient>
+  </defs>
+</svg>

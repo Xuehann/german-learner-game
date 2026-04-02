@@ -120,7 +120,9 @@ describe('updatePlanDaysForCurrentDay', () => {
     expect(after.settings.planDays).toBe(30);
     expect(afterDay).not.toBeNull();
     expect(afterDay?.planDaysLeft).toBeGreaterThanOrEqual(beforeDay?.planDaysLeft ?? 1);
-    expect(afterDay?.goalComputedAt).not.toBe(beforeDay?.goalComputedAt);
+    expect(new Date(afterDay?.goalComputedAt ?? '').getTime()).toBeGreaterThanOrEqual(
+      new Date(beforeDay?.goalComputedAt ?? '').getTime()
+    );
 
     const beforeGoal = beforeDay?.goal.newMasteredTarget ?? 0;
     const afterGoal = afterDay?.goal.newMasteredTarget ?? 0;

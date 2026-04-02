@@ -166,6 +166,12 @@ export function GamePage() {
       >
         词库中心
       </Link>
+      <Link
+        to="/explore"
+        className="ml-2 mt-2 inline-block rounded border border-[#315240] bg-[#e5f5eb] px-2 py-1 text-xs text-[#244136]"
+      >
+        出门旅游
+      </Link>
       <button
         type="button"
         onClick={() => resetAllLocalData()}
@@ -316,13 +322,21 @@ export function GamePage() {
                   className="absolute left-1/2 -translate-x-1/2"
                   style={{ bottom: 'calc(clamp(16px, 4vh, 40px) + env(safe-area-inset-bottom))' }}
                 >
-                  <button
-                    type="button"
-                    onClick={() => advanceIntro()}
-                    className="rounded border-4 border-[#244e31] bg-[#3d8f54] px-6 py-2 text-white shadow-[0_4px_0_#1f3f2a]"
-                  >
-                    推门营业
-                  </button>
+                  <div className="flex flex-wrap items-end justify-center gap-3">
+                    <button
+                      type="button"
+                      onClick={() => advanceIntro()}
+                      className="rounded border-4 border-[#244e31] bg-[#3d8f54] px-6 py-2 text-white shadow-[0_4px_0_#1f3f2a]"
+                    >
+                      推门营业
+                    </button>
+                    <Link
+                      to="/explore"
+                      className="rounded border-4 border-[#315240] bg-[#3d8f54] px-6 py-2 text-white shadow-[0_4px_0_#23372f]"
+                    >
+                      出门旅游
+                    </Link>
+                  </div>
                 </div>
               </div>
             </section>

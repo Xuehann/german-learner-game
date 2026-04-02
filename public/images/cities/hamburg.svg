@@ -1,0 +1,19 @@
+<svg width="960" height="640" viewBox="0 0 960 640" fill="none" xmlns="http://www.w3.org/2000/svg">
+  <rect width="960" height="640" rx="40" fill="#E5F1F2"/>
+  <rect x="48" y="48" width="864" height="544" rx="30" fill="url(#sky)"/>
+  <rect x="80" y="392" width="800" height="120" rx="28" fill="#67B8D8"/>
+  <rect x="115" y="480" width="740" height="60" rx="18" fill="#77B96F"/>
+  <rect x="180" y="262" width="140" height="170" rx="16" fill="#B65E42"/>
+  <rect x="350" y="210" width="180" height="220" rx="18" fill="#B95D44"/>
+  <rect x="570" y="150" width="200" height="280" rx="20" fill="#F2F5F8"/>
+  <path d="M570 192H770L710 142H630L570 192Z" fill="#A9C8D8"/>
+  <path d="M600 430H740L710 330H630L600 430Z" fill="#F2F5F8"/>
+  <path d="M120 406C250 370 370 370 500 406V430H120V406Z" fill="#4D98BD"/>
+  <text x="132" y="552" fill="#183047" font-size="28" font-family="'Bree Serif', serif">Hamburg • Harbor, Speicherstadt, Elbphilharmonie</text>
+  <defs>
+    <linearGradient id="sky" x1="480" y1="48" x2="480" y2="592" gradientUnits="userSpaceOnUse">
+      <stop stop-color="#D8F0FF"/>
+      <stop offset="1" stop-color="#A5D6F0"/>
+    </linearGradient>
+  </defs>
+</svg>

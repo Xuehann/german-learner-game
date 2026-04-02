@@ -1,0 +1,19 @@
+<svg width="960" height="640" viewBox="0 0 960 640" fill="none" xmlns="http://www.w3.org/2000/svg">
+  <rect width="960" height="640" rx="40" fill="#F3E3D7"/>
+  <rect x="48" y="48" width="864" height="544" rx="30" fill="url(#sky)"/>
+  <rect x="70" y="430" width="820" height="95" rx="22" fill="#5F9CC2"/>
+  <rect x="96" y="494" width="770" height="46" rx="16" fill="#86B96E"/>
+  <path d="M260 440V208H318V440H260Z" fill="#806150"/>
+  <path d="M330 440V138H388V440H330Z" fill="#6D5247"/>
+  <path d="M279 208L289 135L299 208H279Z" fill="#4B3833"/>
+  <path d="M349 138L359 70L369 138H349Z" fill="#4B3833"/>
+  <rect x="495" y="305" width="255" height="20" rx="10" fill="#D8C6B7"/>
+  <path d="M520 430C550 360 692 360 725 430H520Z" fill="#B97C5F"/>
+  <text x="132" y="552" fill="#432719" font-size="28" font-family="'Bree Serif', serif">Köln • Cathedral skyline above the Rhine</text>
+  <defs>
+    <linearGradient id="sky" x1="480" y1="48" x2="480" y2="592" gradientUnits="userSpaceOnUse">
+      <stop stop-color="#D9ECFF"/>
+      <stop offset="1" stop-color="#F9CDA0"/>
+    </linearGradient>
+  </defs>
+</svg>

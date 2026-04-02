@@ -4,10 +4,13 @@
 - 英文词展示 -> 输入德语 -> 判定
 - 仅答对触发切香肠成功动画（1.2s）
 - 答错立即显示正确答案与用户输入
+- 德国城市探索模块：德国地图选城 -> 主题选择 -> AI 明信片阅读
 - 学习单元系统（创建/切换/重命名/删除）
 - JSON 词库上传（每次上传创建独立学习单元）
 - AI 文本生成词库（`POST /api/units/generate` 后端代理）
+- AI 城市明信片生成（`POST /api/postcards/generate`，依赖 OpenAI）
 - 本地持久化：设置、单词进度、会话历史
+- 本地持久化：明信片收藏册、探索会话
 - 德语输入辅助：Alt+A/O/U/S 与虚拟键盘 `ä ö ü ß`
 
 ## 启动
@@ -16,10 +19,36 @@ npm install
 npm run dev
 ```
 
+如需启用城市明信片 AI 生成功能，请先配置：
+
+```bash
+cp .env.example .env.local
+```
+
+然后编辑 `.env.local`：
+
+```bash
+OPENAI_API_KEY=your_key_here
+OPENAI_TEXT_MODEL=gpt-4.1-mini
+```
+
+说明：
+- `OPENAI_API_KEY` 必填
+- `OPENAI_TEXT_MODEL` 可选，默认 `gpt-4.1-mini`
+- 修改 `.env.local` 后需要重启 `npm run dev`
+
 ## 测试
 ```bash
 npm test
 ```
+
+## 德国城市探索模块说明
+- 首页新增“出门旅游”入口，可跳转到 `/explore`
+- `v1` 预置 6 座德国城市，使用 voxel 风格地图选城
+- 每座城市按主题维护本地事实数据，AI 生成时会把这些事实注入 prompt
+- 明信片图片为本地固定城市图，不走 AI 图片生成
+- 英文内容由同一次生成请求返回，可整篇切换
+- 收藏册保存在浏览器本地存储
 
 ## JSON 词库格式
 ```json

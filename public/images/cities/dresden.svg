@@ -1,0 +1,18 @@
+<svg width="960" height="640" viewBox="0 0 960 640" fill="none" xmlns="http://www.w3.org/2000/svg">
+  <rect width="960" height="640" rx="40" fill="#F5E8D6"/>
+  <rect x="48" y="48" width="864" height="544" rx="30" fill="url(#sky)"/>
+  <rect x="90" y="418" width="780" height="112" rx="24" fill="#78ABDA"/>
+  <rect x="118" y="492" width="728" height="44" rx="14" fill="#93BF74"/>
+  <rect x="170" y="288" width="160" height="132" rx="18" fill="#E4D6B0"/>
+  <circle cx="250" cy="265" r="55" fill="#D1B06C"/>
+  <rect x="390" y="240" width="250" height="178" rx="18" fill="#D9C2A7"/>
+  <rect x="690" y="220" width="82" height="198" rx="14" fill="#BE9D72"/>
+  <path d="M682 220H780L731 168L682 220Z" fill="#9E7856"/>
+  <text x="132" y="552" fill="#4D3020" font-size="28" font-family="'Bree Serif', serif">Dresden • Baroque dome, river terrace, old town</text>
+  <defs>
+    <linearGradient id="sky" x1="480" y1="48" x2="480" y2="592" gradientUnits="userSpaceOnUse">
+      <stop stop-color="#CFE7FF"/>
+      <stop offset="1" stop-color="#F7D4A8"/>
+    </linearGradient>
+  </defs>
+</svg>

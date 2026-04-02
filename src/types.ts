@@ -24,6 +24,54 @@ export interface LearningUnit {
 
 export type UnitWord = Word;
 
+export type CityTheme = 'culture' | 'architecture' | 'landmarks' | 'food' | 'festivals';
+
+export interface CityThemeFacts {
+  available: boolean;
+  facts: string[];
+  keywords: string[];
+  unavailableReason?: string;
+}
+
+export interface CityProfile {
+  id: string;
+  nameDe: string;
+  nameEn: string;
+  countryRegion: string;
+  summary: string;
+  imageUrl: string;
+  mapPosition: {
+    left: string;
+    top: string;
+  };
+  factsByTheme: Partial<Record<CityTheme, CityThemeFacts>>;
+}
+
+export interface GeneratedPostcard {
+  id: string;
+  cityId: string;
+  theme: CityTheme;
+  title: string;
+  caption: string;
+  germanText: string;
+  englishText: string;
+  imageUrl: string;
+  createdAt: string;
+  source: 'ai';
+}
+
+export interface PostcardAlbumEntry {
+  id: string;
+  savedAt: string;
+  postcard: GeneratedPostcard;
+}
+
+export interface ExploreSessionState {
+  selectedCityId: string | null;
+  selectedTheme: CityTheme | null;
+  activePostcard: GeneratedPostcard | null;
+}
+
 export interface WordProgress {
   wordId: string;
   attempts: number;

@@ -1,8 +1,10 @@
 import type {
   BusinessRuntimeSnapshot,
   CoinWallet,
+  ExploreSessionState,
   GameSession,
   GameSettings,
+  PostcardAlbumEntry,
   LearningUnit,
   SausageCollection,
   UnitWord,
@@ -23,7 +25,9 @@ const storageKeys = {
   activeUnitId: 'sausage_learning_active_unit_id',
   coinWallet: 'sausage_shop_coin_wallet',
   sausageCollection: 'sausage_shop_collection',
-  runtimeSnapshot: 'sausage_shop_runtime_snapshot'
+  runtimeSnapshot: 'sausage_shop_runtime_snapshot',
+  postcardAlbum: 'travel_postcard_album',
+  postcardSession: 'travel_postcard_session'
 } as const;
 
 const readJson = <T>(key: string, fallback: T): T => {
@@ -127,6 +131,24 @@ export const saveRuntimeSnapshot = (snapshot: BusinessRuntimeSnapshot): void => 
 
 export const clearRuntimeSnapshot = (): void => {
   removeKey(storageKeys.runtimeSnapshot);
+};
+
+export const loadPostcardAlbum = (): PostcardAlbumEntry[] =>
+  readJson<PostcardAlbumEntry[]>(storageKeys.postcardAlbum, []);
+
+export const savePostcardAlbum = (album: PostcardAlbumEntry[]): void => {
+  writeJson(storageKeys.postcardAlbum, album);
+};
+
+export const loadPostcardSession = (): ExploreSessionState =>
+  readJson<ExploreSessionState>(storageKeys.postcardSession, {
+    selectedCityId: null,
+    selectedTheme: null,
+    activePostcard: null
+  });
+
+export const savePostcardSession = (session: ExploreSessionState): void => {
+  writeJson(storageKeys.postcardSession, session);
 };
 
 export const storageKeyMap = storageKeys;

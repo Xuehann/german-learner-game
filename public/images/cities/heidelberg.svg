@@ -1,0 +1,17 @@
+<svg width="960" height="640" viewBox="0 0 960 640" fill="none" xmlns="http://www.w3.org/2000/svg">
+  <rect width="960" height="640" rx="40" fill="#F2E6D5"/>
+  <rect x="48" y="48" width="864" height="544" rx="30" fill="url(#sky)"/>
+  <path d="M74 420C174 300 334 250 480 264C630 278 756 340 886 420V530H74V420Z" fill="#87B66B"/>
+  <rect x="140" y="452" width="700" height="52" rx="20" fill="#6DA7D2"/>
+  <rect x="250" y="228" width="250" height="132" rx="18" fill="#B65D47"/>
+  <rect x="560" y="290" width="120" height="130" rx="18" fill="#D7B78B"/>
+  <rect x="690" y="312" width="76" height="108" rx="16" fill="#D7B78B"/>
+  <path d="M200 452H760L730 422H230L200 452Z" fill="#C3B19E"/>
+  <text x="132" y="552" fill="#492D1C" font-size="28" font-family="'Bree Serif', serif">Heidelberg • Castle, old bridge, Neckar valley</text>
+  <defs>
+    <linearGradient id="sky" x1="480" y1="48" x2="480" y2="592" gradientUnits="userSpaceOnUse">
+      <stop stop-color="#D4ECFF"/>
+      <stop offset="1" stop-color="#F7D5A3"/>
+    </linearGradient>
+  </defs>
+</svg>

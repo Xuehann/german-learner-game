@@ -1,0 +1,18 @@
+<svg width="960" height="640" viewBox="0 0 960 640" fill="none" xmlns="http://www.w3.org/2000/svg">
+  <rect width="960" height="640" rx="40" fill="#F4E8D4"/>
+  <rect x="48" y="48" width="864" height="544" rx="30" fill="url(#sky)"/>
+  <rect x="70" y="410" width="820" height="130" rx="26" fill="#98CF78"/>
+  <rect x="205" y="255" width="220" height="190" rx="18" fill="#EADCB4"/>
+  <rect x="250" y="170" width="42" height="110" rx="10" fill="#A77C4F"/>
+  <rect x="336" y="148" width="42" height="132" rx="10" fill="#A77C4F"/>
+  <rect x="520" y="288" width="210" height="157" rx="18" fill="#B57B4A"/>
+  <path d="M500 445H750L720 382H530L500 445Z" fill="#9C603A"/>
+  <circle cx="810" cy="155" r="44" fill="#FFF0A2"/>
+  <text x="132" y="552" fill="#48311F" font-size="28" font-family="'Bree Serif', serif">München • Marienplatz, towers, beer garden mood</text>
+  <defs>
+    <linearGradient id="sky" x1="480" y1="48" x2="480" y2="592" gradientUnits="userSpaceOnUse">
+      <stop stop-color="#CBE8FF"/>
+      <stop offset="1" stop-color="#F5D99B"/>
+    </linearGradient>
+  </defs>
+</svg>
