@@ -85,7 +85,6 @@ export function GamePage() {
     answers,
     startBusinessDay,
     advanceIntro,
-    skipIntro,
     openShop,
     closeShop,
     applyPlanAdjustmentAndStartNextDay,
@@ -295,13 +294,6 @@ export function GamePage() {
                   >
                     推门营业
                   </button>
-                  <button
-                    type="button"
-                    onClick={() => skipIntro()}
-                    className="rounded border-4 border-[#5a4631] bg-[#9a7a54] px-6 py-2 text-white shadow-[0_4px_0_#4b3826]"
-                  >
-                    跳过开门动画
-                  </button>
                 </div>
               </div>
             </section>
@@ -323,13 +315,6 @@ export function GamePage() {
                   className="rounded border-4 border-[#244e31] bg-[#3d8f54] px-6 py-2 text-white shadow-[0_4px_0_#1f3f2a]"
                 >
                   开始营业
-                </button>
-                <button
-                  type="button"
-                  onClick={() => openShop()}
-                  className="rounded border-4 border-[#69431f] bg-[#b97531] px-6 py-2 text-white shadow-[0_4px_0_#633814]"
-                >
-                  先逛商店
                 </button>
               </div>
             </section>

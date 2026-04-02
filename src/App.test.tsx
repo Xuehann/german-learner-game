@@ -1,7 +1,8 @@
-import { render, screen } from '@testing-library/react';
+import { act, render, screen } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { beforeEach, describe, expect, it } from 'vitest';
 import App from './App';
+import { useGameStore } from './store/gameStore';
 
 describe('App', () => {
   beforeEach(() => {
@@ -21,6 +22,23 @@ describe('App', () => {
 
     render(<App />);
     expect(await screen.findByText('词库中心')).toBeInTheDocument();
+  });
+
+  it('shows only 推门营业 in intro_door and enters intro_goal on click', async () => {
+    const user = userEvent.setup();
+    render(<App />);
+
+    expect(await screen.findByText('Wortwurst Metzgerei')).toBeInTheDocument();
+
+    act(() => {
+      useGameStore.setState({ phase: 'intro_door' });
+    });
+
+    expect(screen.getByRole('button', { name: '推门营业' })).toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: '跳过开门动画' })).not.toBeInTheDocument();
+
+    await user.click(screen.getByRole('button', { name: '推门营业' }));
+    expect(screen.getByText('今日运营目标')).toBeInTheDocument();
   });
 
   it('navigates between game and units pages', async () => {
