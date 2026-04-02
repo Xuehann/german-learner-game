@@ -88,6 +88,7 @@ export function GamePage() {
     openShop,
     closeShop,
     applyPlanAdjustmentAndStartNextDay,
+    updatePlanDaysForCurrentDay,
     setInput,
     appendSpecialChar,
     submitOrderAnswer,
@@ -101,6 +102,9 @@ export function GamePage() {
   const [showHint, setShowHint] = useState(false);
   const [cutAnimTick, setCutAnimTick] = useState(0);
   const [nextPlanDays, setNextPlanDays] = useState(settings.planDays);
+  const [showIntroGoalEditor, setShowIntroGoalEditor] = useState(false);
+  const [introGoalPlanDaysInput, setIntroGoalPlanDaysInput] = useState(String(settings.planDays));
+  const [introGoalPlanDaysError, setIntroGoalPlanDaysError] = useState<string | null>(null);
   const inputRef = useRef<HTMLInputElement>(null);
 
   const learningPool = useMemo(() => resolveLearningPool(allWords), [allWords]);
@@ -225,6 +229,17 @@ export function GamePage() {
     }
   }, [phase, settings.planDays]);
 
+  useEffect(() => {
+    if (phase !== 'intro_goal') {
+      setShowIntroGoalEditor(false);
+      setIntroGoalPlanDaysError(null);
+      return;
+    }
+
+    setIntroGoalPlanDaysInput(String(settings.planDays));
+    setIntroGoalPlanDaysError(null);
+  }, [phase, settings.planDays]);
+
   if (!isInitialized || !businessDay) {
     return <div className="p-6 text-center text-butcher-deep">正在准备德国肉铺经营看板...</div>;
   }
@@ -247,6 +262,19 @@ export function GamePage() {
 
   const isServing = phase === 'serving_order';
   const disabledInput = !isServing || !currentOrder;
+
+  const saveIntroGoalPlanDays = () => {
+    const parsed = Number.parseInt(introGoalPlanDaysInput, 10);
+    if (!Number.isFinite(parsed) || parsed < 1 || parsed > 30) {
+      setIntroGoalPlanDaysError('请输入 1-30 的整数天数。');
+      return;
+    }
+
+    updatePlanDaysForCurrentDay(parsed);
+    setShowIntroGoalEditor(false);
+    setIntroGoalPlanDaysError(null);
+    setIntroGoalPlanDaysInput(String(parsed));
+  };
 
   const showBusinessBoard =
     phase === 'serving_order' || phase === 'show_order_feedback' || phase === 'shop' || phase === 'intro_goal';
@@ -278,7 +306,7 @@ export function GamePage() {
                 className="absolute inset-0 bg-contain bg-center bg-no-repeat"
                 style={{ backgroundImage: "url('/images/intro-door-bg.png')" }}
               />
-              <div className="absolute inset-0 bg-[linear-gradient(180deg,rgba(30,20,12,0.28)_0%,rgba(25,16,10,0.36)_58%,rgba(20,12,8,0.48)_100%)]" />
+              <div className="absolute inset-0 bg-[linear-gradient(180deg,rgba(30,20,12,0.12)_0%,rgba(25,16,10,0.18)_58%,rgba(20,12,8,0.26)_100%)]" />
 
               <div className="relative z-10 h-full p-4 sm:p-6">
                 <div className="absolute right-3 top-3 z-20 max-w-[min(100%,360px)]">
@@ -317,7 +345,59 @@ export function GamePage() {
                 >
                   开始营业
                 </button>
+                <button
+                  type="button"
+                  onClick={() => {
+                    setShowIntroGoalEditor(true);
+                    setIntroGoalPlanDaysInput(String(settings.planDays));
+                    setIntroGoalPlanDaysError(null);
+                  }}
+                  className="rounded border-4 border-[#5a4631] bg-[#9a7a54] px-6 py-2 text-white shadow-[0_4px_0_#4b3826]"
+                >
+                  修改计划
+                </button>
               </div>
+
+              {showIntroGoalEditor && (
+                <div className="mx-auto mt-4 max-w-xl rounded border-2 border-[#7a5c3a] bg-[#fffaf0] p-3 text-sm">
+                  <p className="text-xs text-[#5a3f27]">设置几天内完成当前学习计划（1-30 天）。</p>
+                  <div className="mt-2 flex flex-wrap items-center gap-2">
+                    <input
+                      type="number"
+                      min={1}
+                      max={30}
+                      step={1}
+                      value={introGoalPlanDaysInput}
+                      onChange={(event) => {
+                        setIntroGoalPlanDaysInput(event.target.value);
+                        if (introGoalPlanDaysError) {
+                          setIntroGoalPlanDaysError(null);
+                        }
+                      }}
+                      className="w-28 rounded border border-[#8b6944] bg-white px-2 py-1"
+                    />
+                    <button
+                      type="button"
+                      onClick={saveIntroGoalPlanDays}
+                      className="rounded border border-[#335f3e] bg-[#e6f6dd] px-3 py-1"
+                    >
+                      保存
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setShowIntroGoalEditor(false);
+                        setIntroGoalPlanDaysError(null);
+                        setIntroGoalPlanDaysInput(String(settings.planDays));
+                      }}
+                      className="rounded border border-[#8a6540] bg-white px-3 py-1"
+                    >
+                      取消
+                    </button>
+                  </div>
+                  {introGoalPlanDaysError && <p className="mt-2 text-xs text-[#8d2a1d]">{introGoalPlanDaysError}</p>}
+                </div>
+              )}
             </section>
           )}
 
