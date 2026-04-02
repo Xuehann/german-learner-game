@@ -1,7 +1,13 @@
 import { create } from 'zustand';
 import { GERMAN_CITIES, getCityById, getThemeFacts } from '../data/germanCities';
 import { loadPostcardAlbum, loadPostcardSession, savePostcardAlbum, savePostcardSession } from '../lib/storage';
-import type { CityTheme, ExploreSessionState, GeneratedPostcard, PostcardAlbumEntry } from '../types';
+import type {
+  CityTheme,
+  ExploreSessionState,
+  GeneratedPostcard,
+  PostcardAlbumEntry,
+  PostcardImageSource
+} from '../types';
 
 const MAX_ALBUM_SIZE = 60;
 
@@ -34,8 +40,13 @@ type PostcardResponsePayload = {
   caption?: unknown;
   germanText?: unknown;
   englishText?: unknown;
+  imageUrl?: unknown;
+  imageSource?: unknown;
   error?: unknown;
 };
+
+const isPostcardImageSource = (value: unknown): value is PostcardImageSource =>
+  value === 'pexels-theme' || value === 'pexels-city' || value === 'static-fallback';
 
 const baseSession = (): ExploreSessionState => ({
   selectedCityId: null,
@@ -224,7 +235,8 @@ export const useExploreStore = create<ExploreState>((set, get) => ({
         caption: payload.caption.trim(),
         germanText: payload.germanText.trim(),
         englishText: payload.englishText.trim(),
-        imageUrl: city.imageUrl,
+        imageUrl: typeof payload.imageUrl === 'string' && payload.imageUrl.trim() ? payload.imageUrl.trim() : city.imageUrl,
+        ...(isPostcardImageSource(payload.imageSource) ? { imageSource: payload.imageSource } : {}),
         createdAt: new Date().toISOString(),
         source: 'ai'
       };

@@ -23,18 +23,38 @@ describe('ExplorePage', () => {
     vi.restoreAllMocks();
   });
 
-  it('disables unavailable themes for a city with incomplete facts', async () => {
+  it('selects a random available theme after city selection', async () => {
     const user = userEvent.setup();
+    vi.spyOn(Math, 'random').mockReturnValue(0);
+    const fetchMock = vi.spyOn(globalThis, 'fetch').mockResolvedValue({
+      ok: true,
+      text: async () =>
+        JSON.stringify({
+          title: 'Heidelberg Kulturkarte',
+          caption: 'Old university and calm river view',
+          germanText: 'Ich bin heute in Heidelberg. Die Stadt hat eine alte Universität.',
+          englishText: 'I am in Heidelberg today. The city has an old university.'
+        })
+    } as Response);
+
     renderExplorePage();
 
-    await user.click(await screen.findByRole('button', { name: /Heidelberg/i }));
+    await user.click(await screen.findByRole('button', { name: /选择城市 Heidelberg/i }));
 
-    const festivalsButton = screen.getByRole('button', { name: /节日/ });
-    expect(festivalsButton).toBeDisabled();
-    expect(screen.getByText('海德堡适合浪漫、大学城和老城阅读；节庆资料在 v1 先不开放，用来测试主题禁用态。')).toBeInTheDocument();
+    expect(fetchMock).toHaveBeenCalledTimes(1);
+    const request = fetchMock.mock.calls[0]?.[1] as RequestInit | undefined;
+    const payload = JSON.parse(String(request?.body ?? '{}')) as {
+      cityId?: string;
+      theme?: string;
+      readingLevel?: string;
+    };
+
+    expect(payload.cityId).toBe('heidelberg');
+    expect(payload.theme).toBe('culture');
+    expect(payload.readingLevel).toBe('A1-A2');
   });
 
-  it('generates a postcard, toggles translation, and saves to album', async () => {
+  it('opens postcard modal, toggles translation, and saves to album', async () => {
     const user = userEvent.setup();
     const fetchMock = vi.spyOn(globalThis, 'fetch').mockResolvedValue({
       ok: true,
@@ -43,41 +63,51 @@ describe('ExplorePage', () => {
           title: 'Berlin am Wasser',
           caption: 'Spree walk and city lights',
           germanText: 'Ich bin heute in Berlin. Ich sehe die Spree und den Fernsehturm.',
-          englishText: 'I am in Berlin today. I see the Spree and the TV Tower.'
+          englishText: 'I am in Berlin today. I see the Spree and the TV Tower.',
+          imageUrl: 'https://images.pexels.com/photos/1000/sample.jpg',
+          imageSource: 'pexels-theme'
         })
     } as Response);
 
     renderExplorePage();
 
-    await user.click(await screen.findByRole('button', { name: /Berlin/i }));
-    await user.click(screen.getByRole('button', { name: /景点/ }));
+    await user.click(await screen.findByRole('button', { name: /选择城市 Berlin/i }));
 
-    expect(fetchMock).toHaveBeenCalledWith(
-      '/api/postcards/generate',
-      expect.objectContaining({
-        method: 'POST',
-        body: JSON.stringify({
-          cityId: 'berlin',
-          theme: 'landmarks',
-          readingLevel: 'A1-A2'
-        })
-      })
-    );
+    expect(fetchMock).toHaveBeenCalledTimes(1);
+    const request = fetchMock.mock.calls[0]?.[1] as RequestInit | undefined;
+    const payload = JSON.parse(String(request?.body ?? '{}')) as {
+      cityId?: string;
+      theme?: string;
+      readingLevel?: string;
+    };
 
-    expect(await screen.findByText('Berlin am Wasser')).toBeInTheDocument();
+    expect(payload.cityId).toBe('berlin');
+    expect(payload.readingLevel).toBe('A1-A2');
+    expect(typeof payload.theme).toBe('string');
+
+    expect(await screen.findByRole('dialog', { name: '城市明信片' })).toBeInTheDocument();
+    expect(screen.getByText('Berlin am Wasser')).toBeInTheDocument();
     expect(screen.getByText('Ich bin heute in Berlin. Ich sehe die Spree und den Fernsehturm.')).toBeInTheDocument();
+    expect(screen.getByRole('img', { name: 'Berlin am Wasser postcard' })).toHaveAttribute(
+      'src',
+      'https://images.pexels.com/photos/1000/sample.jpg'
+    );
 
     await user.click(screen.getByRole('button', { name: '翻译成英文' }));
     expect(screen.getByText('I am in Berlin today. I see the Spree and the TV Tower.')).toBeInTheDocument();
 
     await user.click(screen.getByRole('button', { name: '收藏明信片' }));
+    await user.click(screen.getByRole('button', { name: /明信片收藏夹/ }));
+    expect(await screen.findByRole('dialog', { name: '明信片收藏夹' })).toBeInTheDocument();
 
     const album = JSON.parse(window.localStorage.getItem(storageKeyMap.postcardAlbum) ?? '[]') as Array<{
-      postcard: { title: string };
+      postcard: { title: string; imageUrl: string; imageSource?: string };
     }>;
 
     expect(album).toHaveLength(1);
     expect(album[0]?.postcard.title).toBe('Berlin am Wasser');
+    expect(album[0]?.postcard.imageUrl).toBe('https://images.pexels.com/photos/1000/sample.jpg');
+    expect(album[0]?.postcard.imageSource).toBe('pexels-theme');
     expect(screen.getByRole('button', { name: /Berlin am Wasser/ })).toBeInTheDocument();
   });
 
@@ -90,8 +120,7 @@ describe('ExplorePage', () => {
 
     renderExplorePage();
 
-    await user.click(await screen.findByRole('button', { name: /Berlin/i }));
-    await user.click(screen.getByRole('button', { name: /景点/ }));
+    await user.click(await screen.findByRole('button', { name: /选择城市 Berlin/i }));
 
     expect(await screen.findByText('AI 服务返回空响应，请稍后重试。')).toBeInTheDocument();
   });

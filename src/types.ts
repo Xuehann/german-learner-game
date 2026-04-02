@@ -25,6 +25,7 @@ export interface LearningUnit {
 export type UnitWord = Word;
 
 export type CityTheme = 'culture' | 'architecture' | 'landmarks' | 'food' | 'festivals';
+export type PostcardImageSource = 'pexels-theme' | 'pexels-city' | 'static-fallback';
 
 export interface CityThemeFacts {
   available: boolean;
@@ -56,6 +57,7 @@ export interface GeneratedPostcard {
   germanText: string;
   englishText: string;
   imageUrl: string;
+  imageSource?: PostcardImageSource;
   createdAt: string;
   source: 'ai';
 }

@@ -2,8 +2,9 @@ import { defineConfig, type Plugin } from 'vitest/config';
 import react from '@vitejs/plugin-react';
 import { loadEnv } from 'vite';
 import { getCityById, getThemeFacts } from './src/data/germanCities';
+import { resolvePostcardImage } from './src/lib/postcardImageResolver';
 import { buildPostcardPrompt } from './src/lib/postcardPrompt';
-import type { CityTheme } from './src/types';
+import type { CityTheme, PostcardImageSource } from './src/types';
 
 type UnitGenerateRequest = {
   unitName?: string;
@@ -31,9 +32,15 @@ type GeneratedPostcardPayload = {
   englishText: string;
 };
 
+type GeneratedPostcardApiResponse = GeneratedPostcardPayload & {
+  imageUrl: string;
+  imageSource: PostcardImageSource;
+};
+
 type OpenAISettings = {
   apiKey: string;
   textModel: string;
+  pexelsApiKey: string;
 };
 
 const stripLinePrefix = (line: string): string => line.replace(/^\s*[\d]+[.)、]\s*/, '').trim();
@@ -348,8 +355,22 @@ const learningUnitApiPlugin = (settings: OpenAISettings): Plugin => {
         theme,
         readingLevel
       }, settings);
+      const image = await resolvePostcardImage({
+        cityId,
+        cityNameEn: city.nameEn,
+        theme,
+        staticImageUrl: city.imageUrl,
+        themeKeywords: themeFacts.keywords,
+        pexelsApiKey: settings.pexelsApiKey
+      });
 
-      sendJson(res, 200, postcard);
+      const responsePayload: GeneratedPostcardApiResponse = {
+        ...postcard,
+        imageUrl: image.imageUrl,
+        imageSource: image.imageSource
+      };
+
+      sendJson(res, 200, responsePayload);
     } catch (error) {
       sendJson(res, 400, {
         error: error instanceof Error ? error.message : 'Invalid JSON payload'
@@ -372,7 +393,8 @@ export default defineConfig(({ mode }) => {
   const env = loadEnv(mode, process.cwd(), '');
   const settings: OpenAISettings = {
     apiKey: env.OPENAI_API_KEY || process.env.OPENAI_API_KEY || '',
-    textModel: env.OPENAI_TEXT_MODEL || process.env.OPENAI_TEXT_MODEL || 'gpt-4.1-mini'
+    textModel: env.OPENAI_TEXT_MODEL || process.env.OPENAI_TEXT_MODEL || 'gpt-4.1-mini',
+    pexelsApiKey: env.PEXELS_API_KEY || process.env.PEXELS_API_KEY || ''
   };
 
   return {

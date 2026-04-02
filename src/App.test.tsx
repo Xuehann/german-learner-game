@@ -29,7 +29,7 @@ describe('App', () => {
     window.history.pushState({}, '', '/explore');
 
     render(<App />);
-    expect(await screen.findByText('Voxel 德国地图')).toBeInTheDocument();
+    expect(await screen.findByText('德国地图')).toBeInTheDocument();
   });
 
   it('shows 推门营业 and 出门旅游 in intro_door and enters intro_goal on click', async () => {
@@ -55,7 +55,7 @@ describe('App', () => {
     render(<App />);
 
     await user.click(await screen.findByRole('link', { name: '出门旅游' }));
-    expect(await screen.findByText('Voxel 德国地图')).toBeInTheDocument();
+    expect(await screen.findByText('德国地图')).toBeInTheDocument();
 
     await user.click(screen.getByRole('link', { name: '返回营业台' }));
     expect(await screen.findByText('Wortwurst Metzgerei')).toBeInTheDocument();

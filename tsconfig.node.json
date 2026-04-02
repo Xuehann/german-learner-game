@@ -10,5 +10,11 @@
     "allowSyntheticDefaultImports": true,
     "strict": true
   },
-  "include": ["vite.config.ts", "src/types.ts", "src/data/**/*.ts", "src/lib/postcardPrompt.ts"]
+  "include": [
+    "vite.config.ts",
+    "src/types.ts",
+    "src/data/**/*.ts",
+    "src/lib/postcardPrompt.ts",
+    "src/lib/postcardImageResolver.ts"
+  ]
 }
