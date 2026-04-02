@@ -147,6 +147,30 @@ export function GamePage() {
   const ownedSkins = SAUSAGE_CATALOG.filter((skin) => collection.ownedSkinIds.includes(skin.id));
   const activeUnit = learningUnits.find((unit) => unit.id === activeUnitId) ?? null;
   const activeUnitWordCount = activeUnitId ? (unitWordsMap[activeUnitId]?.length ?? 0) : 0;
+  const planSummaryCard = (
+    <div className="rounded-md border-2 border-[#6a4a2b] bg-[#fff5e6] px-3 py-2 text-sm text-[#3b2918]">
+      <p>
+        学习计划: 第 {planDayIndex} 天 · 剩余 {planDaysLeft} 天 · 词池 {planPoolSize}
+      </p>
+      <p>剩余未掌握: {remainingUnmastered} · 今日准确率: {accuracy}%</p>
+      <p className="mt-1 text-xs">
+        当前学习单元: {activeUnit ? `${activeUnit.name}（${activeUnitWordCount} 词）` : '试玩词池（内置）'}
+      </p>
+      <Link
+        to="/units"
+        className="mt-2 inline-block rounded border border-[#7c5635] bg-[#fff2df] px-2 py-1 text-xs text-[#3f2b19]"
+      >
+        词库中心
+      </Link>
+      <button
+        type="button"
+        onClick={() => resetAllLocalData()}
+        className="ml-2 mt-2 rounded border border-[#7c5635] bg-[#ffe8c8] px-2 py-1 text-xs text-[#3f2b19]"
+      >
+        清空进度并重开
+      </button>
+    </div>
+  );
 
   useEffect(() => {
     setShowHint(false);
@@ -231,62 +255,39 @@ export function GamePage() {
     <main className="mx-auto min-h-screen max-w-[1320px] px-4 py-5 sm:px-6 lg:px-8">
       <div className="rounded-2xl border-4 border-[#3b2c20] bg-[#c8a079] p-2 shadow-[0_10px_0_#2f2117]">
         <div className="rounded-xl border-4 border-[#6f4c2d] bg-[linear-gradient(135deg,#e5c9a5_0%,#dcb98e_45%,#cfa678_100%)] p-4 sm:p-5">
-          <header className="mb-4 rounded-lg border-4 border-[#4e341e] bg-[#f2ddbf] p-3 shadow-[0_4px_0_#7f5c39]">
-            <div className="flex flex-wrap items-center justify-between gap-3">
-              <div>
-                <h1
-                  className="font-signboard text-[2.25rem] leading-[1.02] tracking-[0.015em] text-[#2d1f12] sm:text-[3rem]"
-                  style={{ textShadow: '0 1px 0 rgba(255, 237, 212, 0.7), 0 3px 8px rgba(74, 43, 24, 0.35)' }}
+          {phase !== 'intro_door' && (
+            <header className="mb-4 rounded-lg border-4 border-[#4e341e] bg-[#f2ddbf] p-3 shadow-[0_4px_0_#7f5c39]">
+              <div className="flex flex-wrap items-center justify-between gap-3">
+                <div>
+                  <h1
+                    className="font-signboard text-[2.25rem] leading-[1.02] tracking-[0.015em] text-[#2d1f12] sm:text-[3rem]"
+                    style={{ textShadow: '0 1px 0 rgba(255, 237, 212, 0.7), 0 3px 8px rgba(74, 43, 24, 0.35)' }}
                 >
                   Wortwurst Metzgerei
                 </h1>
                 <p className="text-sm text-[#4e341e]">开门迎客，按计划完成经营目标！</p>
               </div>
-              <div className="rounded-md border-2 border-[#6a4a2b] bg-[#fff5e6] px-3 py-2 text-sm text-[#3b2918]">
-                <p>
-                  学习计划: 第 {planDayIndex} 天 · 剩余 {planDaysLeft} 天 · 词池 {planPoolSize}
-                </p>
-                <p>剩余未掌握: {remainingUnmastered} · 今日准确率: {accuracy}%</p>
-                <p className="mt-1 text-xs">
-                  当前学习单元: {activeUnit ? `${activeUnit.name}（${activeUnitWordCount} 词）` : '试玩词池（内置）'}
-                </p>
-                <Link
-                  to="/units"
-                  className="mt-2 inline-block rounded border border-[#7c5635] bg-[#fff2df] px-2 py-1 text-xs text-[#3f2b19]"
-                >
-                  词库中心
-                </Link>
-                <button
-                  type="button"
-                  onClick={() => resetAllLocalData()}
-                  className="ml-2 mt-2 rounded border border-[#7c5635] bg-[#ffe8c8] px-2 py-1 text-xs text-[#3f2b19]"
-                >
-                  清空进度并重开
-                </button>
+                {planSummaryCard}
               </div>
-            </div>
-          </header>
+            </header>
+          )}
 
           {phase === 'intro_door' && (
-            <section className="relative overflow-hidden rounded-lg border-4 border-[#4b3018] bg-[linear-gradient(180deg,#3f2b1d_0%,#22170f_100%)] p-6 text-[#fbe8cf] shadow-[0_5px_0_#7e5a34]">
-              <div className="absolute inset-0 bg-[radial-gradient(circle_at_center,_rgba(255,220,170,0.25)_0%,_rgba(0,0,0,0)_60%)]" />
-              <div className="relative z-10">
-                <h2 className="text-center font-heading text-3xl">清晨开店</h2>
-                <div className="mt-8 grid min-h-60 grid-cols-2 gap-2">
-                  <motion.div
-                    className="rounded-l-xl border-2 border-[#6d4d2d] bg-[linear-gradient(180deg,#9f6b40_0%,#7f5230_100%)]"
-                    initial={{ x: 0 }}
-                    animate={{ x: -140 }}
-                    transition={{ duration: 1.1, ease: 'easeInOut' }}
-                  />
-                  <motion.div
-                    className="rounded-r-xl border-2 border-[#6d4d2d] bg-[linear-gradient(180deg,#9f6b40_0%,#7f5230_100%)]"
-                    initial={{ x: 0 }}
-                    animate={{ x: 140 }}
-                    transition={{ duration: 1.1, ease: 'easeInOut' }}
-                  />
+            <section className="relative aspect-[43/24] overflow-hidden rounded-lg border-4 border-[#4b3018] bg-[linear-gradient(180deg,#3f2b1d_0%,#22170f_100%)] text-[#fbe8cf] shadow-[0_5px_0_#7e5a34]">
+              <div
+                className="absolute inset-0 bg-contain bg-center bg-no-repeat"
+                style={{ backgroundImage: "url('/images/intro-door-bg.png')" }}
+              />
+              <div className="absolute inset-0 bg-[linear-gradient(180deg,rgba(30,20,12,0.28)_0%,rgba(25,16,10,0.36)_58%,rgba(20,12,8,0.48)_100%)]" />
+
+              <div className="relative z-10 h-full p-4 sm:p-6">
+                <div className="absolute right-3 top-3 z-20 max-w-[min(100%,360px)]">
+                  {planSummaryCard}
                 </div>
-                <div className="mt-5 flex flex-wrap justify-center gap-3">
+                <div
+                  className="absolute left-1/2 -translate-x-1/2"
+                  style={{ bottom: 'calc(clamp(16px, 4vh, 40px) + env(safe-area-inset-bottom))' }}
+                >
                   <button
                     type="button"
                     onClick={() => advanceIntro()}
