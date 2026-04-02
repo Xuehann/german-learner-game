@@ -6,7 +6,7 @@ interface SausageDisplayProps {
 }
 
 export const SausageDisplay = ({ phase }: SausageDisplayProps) => {
-  const isCut = phase === 'cut_success_anim';
+  const isCut = phase === 'show_order_feedback';
 
   return (
     <div className="relative flex min-h-36 items-center justify-center rounded-3xl border-4 border-butcher-wood/30 bg-butcher-cream/70 px-6 py-8">

@@ -31,6 +31,9 @@ export const JsonImportPanel = ({ report, onImport, onClearReport }: JsonImportP
       <p className="mt-2 text-sm text-butcher-deep/80">
         必填字段: <code>id</code>, <code>english</code>, <code>german</code>, <code>category</code>, <code>difficulty</code>
       </p>
+      <p className="mt-1 text-xs text-butcher-deep/70">
+        可选字段: <code>pastTense</code>（动词过去式，答对后用于反馈展示）
+      </p>
       <input
         ref={fileRef}
         type="file"

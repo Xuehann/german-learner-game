@@ -24,11 +24,11 @@ export const DEFAULT_WORDS: Word[] = [
   { id: 'a2-001', english: 'department store', german: 'das Kaufhaus', category: 'daily', difficulty: 'A2', sourceType: 'builtin' },
   { id: 'a2-002', english: 'doctor', german: 'der Arzt', category: 'people', difficulty: 'A2', sourceType: 'builtin' },
   { id: 'a2-003', english: 'medicine', german: 'die Medizin', category: 'health', difficulty: 'A2', sourceType: 'builtin' },
-  { id: 'a2-004', english: 'to decide', german: 'entscheiden', category: 'verb', difficulty: 'A2', sourceType: 'builtin' },
+  { id: 'a2-004', english: 'to decide', german: 'entscheiden', pastTense: 'entschied', category: 'verb', difficulty: 'A2', sourceType: 'builtin' },
   { id: 'a2-005', english: 'weather', german: 'das Wetter', category: 'nature', difficulty: 'A2', sourceType: 'builtin' },
   { id: 'b1-001', english: 'opinion', german: 'die Meinung', category: 'abstract', difficulty: 'B1', sourceType: 'builtin' },
   { id: 'b1-002', english: 'experience', german: 'die Erfahrung', category: 'abstract', difficulty: 'B1', sourceType: 'builtin' },
-  { id: 'b1-003', english: 'to improve', german: 'verbessern', category: 'verb', difficulty: 'B1', sourceType: 'builtin' },
+  { id: 'b1-003', english: 'to improve', german: 'verbessern', pastTense: 'verbesserte', category: 'verb', difficulty: 'B1', sourceType: 'builtin' },
   { id: 'b1-004', english: 'environment', german: 'die Umwelt', category: 'nature', difficulty: 'B1', sourceType: 'builtin' },
   { id: 'b1-005', english: 'responsibility', german: 'die Verantwortung', category: 'abstract', difficulty: 'B1', sourceType: 'builtin' }
 ];

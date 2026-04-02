@@ -64,6 +64,11 @@ export const validateWords = (payload: unknown): { validWords: Word[]; errors: I
       return;
     }
 
+    if (candidate.pastTense !== undefined && typeof candidate.pastTense !== 'string') {
+      errors.push({ index, field: 'pastTense', message: 'pastTense 必须是字符串。' });
+      return;
+    }
+
     const normalized = normalizeWord(candidate as Word);
 
     if (seenIds.has(normalized.id)) {

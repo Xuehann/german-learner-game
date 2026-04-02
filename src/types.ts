@@ -6,6 +6,7 @@ export interface Word {
   german: string;
   gender?: 'der' | 'die' | 'das';
   plural?: string;
+  pastTense?: string;
   category: string;
   difficulty: Difficulty;
   pronunciation?: string;
@@ -27,23 +28,101 @@ export interface WordProgress {
   errorPatterns: string[];
 }
 
+export type OrderType = 'translation' | 'review' | 'combo';
+export type CustomerTier = 'regular' | 'rush' | 'collector';
+
+export interface Customer {
+  id: string;
+  name: string;
+  tier: CustomerTier;
+  avatar: string;
+}
+
+export interface OrderLine {
+  wordId: string;
+  english: string;
+  german: string;
+  category: string;
+  pastTense?: string;
+}
+
+export interface Order {
+  id: string;
+  type: OrderType;
+  customer: Customer;
+  lines: OrderLine[];
+  prompt: string;
+  instruction: string;
+}
+
+export interface DayGoal {
+  newMasteredTarget: number;
+  correctedMistakesTarget: number;
+}
+
+export interface DayProgress {
+  newMastered: number;
+  correctedMistakes: number;
+  servedOrders: number;
+  correctOrders: number;
+}
+
+export interface BusinessDay {
+  id: string;
+  startedAt: string;
+  completedAt?: string;
+  goal: DayGoal;
+  progress: DayProgress;
+  pendingCorrectionWordIds: string[];
+  isCompleted: boolean;
+}
+
+export interface SatisfactionState {
+  current: number;
+  min: number;
+  max: number;
+}
+
+export interface CoinWallet {
+  balance: number;
+  earnedToday: number;
+  spentToday: number;
+}
+
+export type SausageRarity = 'common' | 'rare' | 'epic';
+
+export interface SausageSkin {
+  id: string;
+  name: string;
+  rarity: SausageRarity;
+  price: number;
+  emoji: string;
+  description: string;
+}
+
+export interface SausageCollection {
+  ownedSkinIds: string[];
+  displaySkinId: string | null;
+}
+
 export interface GameSession {
   id: string;
   startTime: string;
   endTime?: string;
-  gameMode: 'sausage_cutting';
+  gameMode: 'butcher_business';
   difficulty: Difficulty | 'mixed';
-  wordsInSession: Word[];
-  currentWordIndex: number;
-  correctAnswers: number;
-  totalAnswers: number;
-  averageTimePerWord: number;
+  dayGoal: DayGoal;
+  dayProgress: DayProgress;
+  accuracy: number;
+  coinsEarned: number;
   isCompleted: boolean;
 }
 
 export interface GameAnswer {
   sessionId: string;
-  wordId: string;
+  orderId: string;
+  orderType: OrderType;
+  wordIds: string[];
   userInput: string;
   correctAnswer: string;
   isCorrect: boolean;
@@ -52,12 +131,7 @@ export interface GameAnswer {
   feedbackType: 'correct' | 'wrong' | 'skip';
 }
 
-export type GamePhase =
-  | 'typing'
-  | 'validating'
-  | 'cut_success_anim'
-  | 'show_correct_answer'
-  | 'completed';
+export type GamePhase = 'serving_order' | 'show_order_feedback' | 'day_summary';
 
 export interface GameFeedback {
   type: 'correct' | 'wrong' | 'skip';
@@ -65,12 +139,11 @@ export interface GameFeedback {
   correctAnswer: string;
   userInput: string;
   note?: string;
+  requiresManualContinue?: boolean;
 }
 
 export interface GameSettings {
-  sessionSize: number;
   difficulty: Difficulty | 'mixed';
-  autoReplace: boolean;
   feedbackDelayMs: number;
 }
 
@@ -83,4 +156,11 @@ export interface ImportValidationError {
 export interface ImportResult {
   addedWords: number;
   errors: ImportValidationError[];
+}
+
+export interface BusinessRuntimeSnapshot {
+  businessDay: BusinessDay;
+  orderQueue: Order[];
+  currentOrder: Order | null;
+  satisfaction: SatisfactionState;
 }
