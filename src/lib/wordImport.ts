@@ -1,17 +1,15 @@
-import type { Difficulty, ImportResult, ImportValidationError, Word } from '../types';
-import { loadImportedWords, saveImportedWords } from './storage';
-
-const VALID_DIFFICULTIES: Difficulty[] = ['A1', 'A2', 'B1'];
-
-const isDifficulty = (value: unknown): value is Difficulty =>
-  typeof value === 'string' && VALID_DIFFICULTIES.includes(value as Difficulty);
+import type { ImportValidationError, Word } from '../types';
 
 const normalizeWord = (word: Word): Word => ({
-  ...word,
   id: word.id.trim(),
   english: word.english.trim(),
   german: word.german.trim(),
   category: word.category.trim(),
+  ...(word.pastTense ? { pastTense: word.pastTense.trim() } : {}),
+  ...(word.gender ? { gender: word.gender } : {}),
+  ...(word.plural ? { plural: word.plural } : {}),
+  ...(word.pronunciation ? { pronunciation: word.pronunciation } : {}),
+  ...(word.example ? { example: word.example } : {}),
   sourceType: 'imported'
 });
 
@@ -37,7 +35,7 @@ export const validateWords = (payload: unknown): { validWords: Word[]; errors: I
       return;
     }
 
-    const candidate = row as Partial<Word>;
+    const candidate = row as Partial<Word> & { difficulty?: unknown };
 
     if (!candidate.id || typeof candidate.id !== 'string') {
       errors.push({ index, field: 'id', message: 'id 是必填字符串。' });
@@ -59,11 +57,6 @@ export const validateWords = (payload: unknown): { validWords: Word[]; errors: I
       return;
     }
 
-    if (!isDifficulty(candidate.difficulty)) {
-      errors.push({ index, field: 'difficulty', message: 'difficulty 仅支持 A1/A2/B1。' });
-      return;
-    }
-
     if (candidate.pastTense !== undefined && typeof candidate.pastTense !== 'string') {
       errors.push({ index, field: 'pastTense', message: 'pastTense 必须是字符串。' });
       return;
@@ -81,21 +74,4 @@ export const validateWords = (payload: unknown): { validWords: Word[]; errors: I
   });
 
   return { validWords, errors };
-};
-
-export const commitWords = (words: Word[]): ImportResult => {
-  const existing = loadImportedWords();
-  const map = new Map<string, Word>(existing.map((word) => [word.id, word]));
-
-  words.forEach((word) => {
-    map.set(word.id, { ...word, sourceType: 'imported' });
-  });
-
-  const merged = Array.from(map.values());
-  saveImportedWords(merged);
-
-  return {
-    addedWords: words.length,
-    errors: []
-  };
 };

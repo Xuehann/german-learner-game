@@ -6,6 +6,7 @@ export default {
     extend: {
       fontFamily: {
         heading: ['"Bree Serif"', 'Georgia', 'serif'],
+        signboard: ['"Lobster"', '"Bree Serif"', 'Georgia', 'serif'],
         body: ['"Noto Sans SC"', '"Segoe UI"', 'sans-serif']
       },
       colors: {

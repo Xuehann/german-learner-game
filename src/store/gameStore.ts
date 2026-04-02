@@ -6,34 +6,43 @@ import { appendSpecialCharacter } from '../lib/germanInput';
 import { computeMasteryLevel, computeNextReviewDate } from '../lib/review';
 import {
   appendSessionHistory,
+  clearLegacyImportedWords,
   clearRuntimeSnapshot,
+  loadActiveUnitId,
   loadCoinWallet,
   loadGameSettings,
-  loadImportedWords,
+  loadLearningUnits,
+  loadLegacyImportedWords,
   loadRuntimeSnapshot,
   loadSausageCollection,
+  loadUnitWordsMap,
   loadWordProgressMap,
+  saveActiveUnitId,
   saveCoinWallet,
   saveGameSettings,
+  saveLearningUnits,
   saveRuntimeSnapshot,
   saveSausageCollection,
+  saveUnitWordsMap,
   saveWordProgressMap,
-  storageKeyMap
+  storageKeyMap,
+  type UnitWordsMap
 } from '../lib/storage';
-import { commitWords, parseJsonWords, validateWords } from '../lib/wordImport';
+import { parseJsonWords, validateWords } from '../lib/wordImport';
 import type {
+  AIGeneratedUnitDraft,
   BusinessDay,
   CoinWallet,
   Customer,
   DayGoal,
   DayProgress,
-  Difficulty,
   GameAnswer,
   GameFeedback,
   GamePhase,
   GameSession,
   GameSettings,
   ImportResult,
+  LearningUnit,
   Order,
   OrderType,
   SausageCollection,
@@ -67,24 +76,20 @@ const normalizePlanStartDate = (value?: string): string => {
 };
 
 const DEFAULT_SETTINGS: GameSettings = {
-  difficulty: 'mixed',
   feedbackDelayMs: 1200,
   planDays: 7,
   planStartDate: normalizePlanStartDate(),
-  planSource: 'imported_only',
   lastIntroDate: undefined
 };
 
 const normalizeSettings = (raw: GameSettings): GameSettings => {
   const merged: GameSettings = {
     ...DEFAULT_SETTINGS,
-    ...raw,
-    planSource: 'imported_only'
+    ...raw
   };
 
   return {
     ...merged,
-    difficulty: merged.difficulty ?? 'mixed',
     feedbackDelayMs: Math.max(300, Math.round(merged.feedbackDelayMs)),
     planDays: Math.max(1, Math.round(merged.planDays)),
     planStartDate: normalizePlanStartDate(merged.planStartDate)
@@ -170,17 +175,49 @@ const normalizeInput = (input: string): string => input.trim().replace(/\s+/g, '
 const buildDayId = () => `day_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`;
 const buildOrderId = () => `order_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`;
 const buildCustomerId = () => `cust_${Math.random().toString(36).slice(2, 8)}`;
+const buildUnitId = () => `unit_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`;
 
 const clamp = (value: number, min: number, max: number): number => Math.max(min, Math.min(max, value));
 
 const pickOne = <T>(items: T[]): T => items[Math.floor(Math.random() * items.length)] as T;
 
-const mergeWords = (builtins: Word[], imported: Word[]): Word[] => {
-  const map = new Map<string, Word>();
-  builtins.forEach((word) => map.set(word.id, word));
-  imported.forEach((word) => map.set(word.id, word));
-  return Array.from(map.values());
+const mergeWords = (builtins: Word[], activeUnitWords: Word[]): Word[] => {
+  return [...builtins, ...activeUnitWords];
 };
+
+const getActiveUnitWords = (unitWordsMap: UnitWordsMap, unitId: string | null): Word[] => {
+  if (!unitId) {
+    return [];
+  }
+
+  return unitWordsMap[unitId] ?? [];
+};
+
+const normalizeUnitName = (name: string | undefined, fallback: string): string => {
+  const trimmed = name?.trim() ?? '';
+  return trimmed.length > 0 ? trimmed : fallback;
+};
+
+const buildImportedWordForUnit = (unitId: string, word: Word, index: number): Word => {
+  const baseId = word.id.trim() || `word_${index + 1}`;
+  const safeBaseId = baseId.replace(/\s+/g, '-').replace(/[^a-zA-Z0-9_:\-]/g, '');
+
+  return {
+    id: `${unitId}::${safeBaseId || `word_${index + 1}`}`,
+    english: word.english.trim(),
+    german: word.german.trim(),
+    category: word.category.trim(),
+    ...(word.pastTense ? { pastTense: word.pastTense.trim() } : {}),
+    ...(word.gender ? { gender: word.gender } : {}),
+    ...(word.plural ? { plural: word.plural } : {}),
+    ...(word.pronunciation ? { pronunciation: word.pronunciation } : {}),
+    ...(word.example ? { example: word.example } : {}),
+    sourceType: 'imported'
+  };
+};
+
+const buildUnitMessage = (name: string, count: number): string =>
+  `学习单元“${name}”已创建并导入 ${count} 个单词。`;
 
 export const resolveLearningPool = (allWords: Word[]): Word[] => {
   const imported = allWords.filter((word) => word.sourceType === 'imported');
@@ -188,8 +225,7 @@ export const resolveLearningPool = (allWords: Word[]): Word[] => {
     return imported;
   }
 
-  const fallbackA1 = allWords.filter((word) => word.difficulty === 'A1');
-  return fallbackA1.length > 0 ? fallbackA1 : allWords;
+  return allWords.filter((word) => word.sourceType !== 'imported');
 };
 
 const parsePlanStartDate = (planStartDate: string): Date => {
@@ -511,9 +547,14 @@ const buildOrder = (
   };
 };
 
+type AIState = 'idle' | 'loading' | 'error' | 'ready';
+
 interface GameState {
   isInitialized: boolean;
   allWords: Word[];
+  learningUnits: LearningUnit[];
+  unitWordsMap: UnitWordsMap;
+  activeUnitId: string | null;
   phase: GamePhase;
   phaseBeforeShop: GamePhase | null;
   currentOrder: Order | null;
@@ -529,6 +570,9 @@ interface GameState {
   wordProgressMap: Record<string, WordProgress>;
   importReport: ImportResult | null;
   settings: GameSettings;
+  aiDraft: AIGeneratedUnitDraft | null;
+  aiState: AIState;
+  aiError: string | null;
   initializeGame: () => void;
   startBusinessDay: () => void;
   generateOrder: () => void;
@@ -549,8 +593,14 @@ interface GameState {
   setDisplaySausage: (skinId: string) => void;
   resetAllLocalData: () => void;
   updateSettings: (patch: Partial<GameSettings>) => void;
-  importWordsFromJsonText: (raw: string) => void;
+  importWordsFromJsonText: (raw: string, unitName?: string) => void;
+  generateWordsFromText: (rawText: string, unitName?: string) => Promise<void>;
+  saveGeneratedDraft: (unitName?: string) => void;
+  clearGeneratedDraft: () => void;
   clearImportReport: () => void;
+  setActiveLearningUnit: (unitId: string | null) => void;
+  renameLearningUnit: (unitId: string, nextName: string) => void;
+  deleteLearningUnit: (unitId: string) => void;
 }
 
 const hydrateBusinessDay = (
@@ -599,9 +649,122 @@ const persistRuntimeFromState = (state: {
   });
 };
 
+const rebuildAllWords = (unitWordsMap: UnitWordsMap, activeUnitId: string | null): Word[] => {
+  return mergeWords(DEFAULT_WORDS, getActiveUnitWords(unitWordsMap, activeUnitId));
+};
+
+const rebuildRunningDayForNewPool = (params: {
+  businessDay: BusinessDay | null;
+  allWords: Word[];
+  settings: GameSettings;
+  wordProgressMap: Record<string, WordProgress>;
+}): { businessDay: BusinessDay; orderQueue: Order[]; currentOrder: Order | null } | null => {
+  const { businessDay, allWords, settings, wordProgressMap } = params;
+  if (!businessDay || businessDay.isCompleted) {
+    return null;
+  }
+
+  const pool = resolveLearningPool(allWords);
+  const pendingCorrectionWordIds = Array.from(new Set(businessDay.pendingCorrectionWordIds)).filter((wordId) =>
+    pool.some((word) => word.id === wordId)
+  );
+  const planProgress = getPlanProgress(settings.planStartDate, settings.planDays);
+  const remainingUnmastered = countRemainingUnmastered(pool, wordProgressMap);
+
+  const nextBusinessDay: BusinessDay = {
+    ...businessDay,
+    goal: buildDynamicDayGoal(remainingUnmastered, pendingCorrectionWordIds.length, planProgress.daysLeft),
+    pendingCorrectionWordIds,
+    planDayIndex: planProgress.dayIndex,
+    planDaysLeft: planProgress.daysLeft,
+    planPoolSize: pool.length,
+    goalComputedAt: new Date().toISOString()
+  };
+
+  const nextQueue: Order[] = [];
+  while (nextQueue.length < QUEUE_SIZE) {
+    nextQueue.push(buildOrder(allWords, wordProgressMap, nextBusinessDay.pendingCorrectionWordIds));
+  }
+
+  return {
+    businessDay: nextBusinessDay,
+    orderQueue: nextQueue,
+    currentOrder: nextQueue[0] ?? null
+  };
+};
+
+const migrateLegacyImportedWordsToUnit = (
+  units: LearningUnit[],
+  unitWordsMap: UnitWordsMap,
+  activeUnitId: string | null
+): { units: LearningUnit[]; unitWordsMap: UnitWordsMap; activeUnitId: string | null } => {
+  if (units.length > 0) {
+    return { units, unitWordsMap, activeUnitId };
+  }
+
+  const legacyWords = loadLegacyImportedWords();
+  if (legacyWords.length === 0) {
+    return { units, unitWordsMap, activeUnitId };
+  }
+
+  const now = new Date().toISOString();
+  const legacyUnitId = 'unit_legacy';
+  const normalizedWords = legacyWords.map((word, index) => buildImportedWordForUnit(legacyUnitId, word, index));
+  const legacyUnit: LearningUnit = {
+    id: legacyUnitId,
+    name: '历史导入单元',
+    createdAt: now,
+    updatedAt: now,
+    wordCount: normalizedWords.length
+  };
+
+  const nextUnits = [legacyUnit];
+  const nextMap: UnitWordsMap = {
+    ...unitWordsMap,
+    [legacyUnitId]: normalizedWords
+  };
+
+  saveLearningUnits(nextUnits);
+  saveUnitWordsMap(nextMap);
+  saveActiveUnitId(legacyUnitId);
+  clearLegacyImportedWords();
+
+  return {
+    units: nextUnits,
+    unitWordsMap: nextMap,
+    activeUnitId: legacyUnitId
+  };
+};
+
+const buildUnitFromWords = (
+  words: Word[],
+  unitName: string | undefined,
+  existingUnits: LearningUnit[]
+): { unit: LearningUnit; unitWords: Word[] } => {
+  const unitId = buildUnitId();
+  const now = new Date().toISOString();
+  const fallbackName = `学习单元 ${existingUnits.length + 1}`;
+  const finalName = normalizeUnitName(unitName, fallbackName);
+
+  const unitWords = words.map((word, index) => buildImportedWordForUnit(unitId, word, index));
+
+  const unit: LearningUnit = {
+    id: unitId,
+    name: finalName,
+    createdAt: now,
+    updatedAt: now,
+    wordCount: unitWords.length
+  };
+
+  return { unit, unitWords };
+};
+
 export const useGameStore = create<GameState>((set, get) => ({
   isInitialized: false,
   allWords: DEFAULT_WORDS,
+  learningUnits: [],
+  unitWordsMap: {},
+  activeUnitId: null,
   phase: 'serving_order',
   phaseBeforeShop: null,
   currentOrder: null,
@@ -617,15 +780,35 @@ export const useGameStore = create<GameState>((set, get) => ({
   wordProgressMap: {},
   importReport: null,
   settings: DEFAULT_SETTINGS,
+  aiDraft: null,
+  aiState: 'idle',
+  aiError: null,
 
   initializeGame: () => {
-    const imported = loadImportedWords();
-    const mergedWords = mergeWords(DEFAULT_WORDS, imported);
     const rawSettings = loadGameSettings(DEFAULT_SETTINGS);
     const settings = normalizeSettings(rawSettings);
     const wordProgressMap = loadWordProgressMap();
     const coins = loadCoinWallet(DEFAULT_WALLET);
     const collection = loadSausageCollection(DEFAULT_COLLECTION);
+
+    const loadedUnits = loadLearningUnits();
+    const loadedMap = loadUnitWordsMap();
+    const loadedActiveId = loadActiveUnitId();
+
+    const migrated = migrateLegacyImportedWordsToUnit(loadedUnits, loadedMap, loadedActiveId);
+    const units = migrated.units;
+    const unitWordsMap = migrated.unitWordsMap;
+
+    const activeUnitId = units.some((unit) => unit.id === migrated.activeUnitId)
+      ? migrated.activeUnitId
+      : units[0]?.id ?? null;
+
+    if (activeUnitId !== migrated.activeUnitId) {
+      saveActiveUnitId(activeUnitId);
+    }
+
+    const allWords = rebuildAllWords(unitWordsMap, activeUnitId);
+
     const runtime = loadRuntimeSnapshot();
     const todayKey = toLocalDateKey(new Date());
     const shouldPlayIntroToday = settings.lastIntroDate !== todayKey;
@@ -641,11 +824,14 @@ export const useGameStore = create<GameState>((set, get) => ({
       const phaseBeforeShop = runtime.phaseBeforeShop
         ? normalizeRuntimePhase(runtime.phaseBeforeShop)
         : null;
-      const hydratedDay = hydrateBusinessDay(runtime.businessDay, settings, mergedWords);
+      const hydratedDay = hydrateBusinessDay(runtime.businessDay, nextSettings, allWords);
 
       set({
         isInitialized: true,
-        allWords: mergedWords,
+        allWords,
+        learningUnits: units,
+        unitWordsMap,
+        activeUnitId,
         settings: nextSettings,
         wordProgressMap,
         coins: {
@@ -683,7 +869,10 @@ export const useGameStore = create<GameState>((set, get) => ({
 
     set({
       isInitialized: true,
-      allWords: mergedWords,
+      allWords,
+      learningUnits: units,
+      unitWordsMap,
+      activeUnitId,
       settings: nextSettings,
       wordProgressMap,
       coins,
@@ -875,8 +1064,7 @@ export const useGameStore = create<GameState>((set, get) => ({
     const nextSettings = normalizeSettings({
       ...get().settings,
       planDays: normalizedDays,
-      planStartDate: tomorrow.toISOString(),
-      planSource: 'imported_only'
+      planStartDate: tomorrow.toISOString()
     });
 
     saveGameSettings(nextSettings);
@@ -930,7 +1118,7 @@ export const useGameStore = create<GameState>((set, get) => ({
   },
 
   completeDayIfGoalMet: () => {
-    const { businessDay, coins, settings } = get();
+    const { businessDay, coins } = get();
     if (!businessDay || businessDay.isCompleted) {
       return false;
     }
@@ -962,7 +1150,6 @@ export const useGameStore = create<GameState>((set, get) => ({
       startTime: completedDay.startedAt,
       endTime: completedDay.completedAt,
       gameMode: 'butcher_business',
-      difficulty: settings.difficulty ?? 'mixed',
       dayGoal: completedDay.goal,
       dayProgress: completedDay.progress,
       accuracy,
@@ -1279,6 +1466,9 @@ export const useGameStore = create<GameState>((set, get) => ({
     set({
       isInitialized: true,
       allWords: DEFAULT_WORDS,
+      learningUnits: [],
+      unitWordsMap: {},
+      activeUnitId: null,
       phase: 'serving_order',
       phaseBeforeShop: null,
       currentOrder: null,
@@ -1293,13 +1483,20 @@ export const useGameStore = create<GameState>((set, get) => ({
       collection: DEFAULT_COLLECTION,
       wordProgressMap: {},
       importReport: null,
-      settings: nextSettings
+      settings: nextSettings,
+      aiDraft: null,
+      aiState: 'idle',
+      aiError: null
     });
 
     clearRuntimeSnapshot();
+    clearLegacyImportedWords();
     saveGameSettings(nextSettings);
     saveCoinWallet(DEFAULT_WALLET);
     saveSausageCollection(DEFAULT_COLLECTION);
+    saveLearningUnits([]);
+    saveUnitWordsMap({});
+    saveActiveUnitId(null);
 
     get().startBusinessDay();
   },
@@ -1307,15 +1504,14 @@ export const useGameStore = create<GameState>((set, get) => ({
   updateSettings: (patch) => {
     const nextSettings = normalizeSettings({
       ...get().settings,
-      ...patch,
-      planSource: 'imported_only'
+      ...patch
     });
 
     saveGameSettings(nextSettings);
     set({ settings: nextSettings });
   },
 
-  importWordsFromJsonText: (raw) => {
+  importWordsFromJsonText: (raw, unitName) => {
     try {
       const parsed = parseJsonWords(raw);
       const { validWords, errors } = validateWords(parsed);
@@ -1330,14 +1526,56 @@ export const useGameStore = create<GameState>((set, get) => ({
         return;
       }
 
-      const result = commitWords(validWords);
-      const imported = loadImportedWords();
-      const allWords = mergeWords(DEFAULT_WORDS, imported);
+      const state = get();
+      const { unit, unitWords } = buildUnitFromWords(validWords, unitName, state.learningUnits);
+      const nextUnits = [unit, ...state.learningUnits];
+      const nextMap: UnitWordsMap = {
+        ...state.unitWordsMap,
+        [unit.id]: unitWords
+      };
+      const nextAllWords = rebuildAllWords(nextMap, unit.id);
+
+      saveLearningUnits(nextUnits);
+      saveUnitWordsMap(nextMap);
+      saveActiveUnitId(unit.id);
+
+      const refreshed = rebuildRunningDayForNewPool({
+        businessDay: state.businessDay,
+        allWords: nextAllWords,
+        settings: state.settings,
+        wordProgressMap: state.wordProgressMap
+      });
+      const nextPhase: GamePhase = state.phase === 'show_order_feedback' ? 'serving_order' : state.phase;
 
       set({
-        allWords,
-        importReport: result
+        learningUnits: nextUnits,
+        unitWordsMap: nextMap,
+        activeUnitId: unit.id,
+        allWords: nextAllWords,
+        businessDay: refreshed?.businessDay ?? state.businessDay,
+        orderQueue: refreshed?.orderQueue ?? state.orderQueue,
+        currentOrder: refreshed?.currentOrder ?? state.currentOrder,
+        feedback: refreshed ? null : state.feedback,
+        currentInput: refreshed ? '' : state.currentInput,
+        orderStartedAtMs: refreshed ? Date.now() : state.orderStartedAtMs,
+        phase: refreshed ? nextPhase : state.phase,
+        importReport: {
+          addedWords: unitWords.length,
+          errors: [],
+          message: buildUnitMessage(unit.name, unitWords.length)
+        }
       });
+
+      if (refreshed) {
+        persistRuntimeFromState({
+          businessDay: refreshed.businessDay,
+          currentOrder: refreshed.currentOrder,
+          orderQueue: refreshed.orderQueue,
+          satisfaction: state.satisfaction,
+          phase: nextPhase,
+          phaseBeforeShop: state.phaseBeforeShop
+        });
+      }
     } catch {
       set({
         importReport: {
@@ -1348,7 +1586,305 @@ export const useGameStore = create<GameState>((set, get) => ({
     }
   },
 
-  clearImportReport: () => set({ importReport: null })
+  generateWordsFromText: async (rawText, unitName) => {
+    if (!rawText.trim()) {
+      set({ aiState: 'error', aiError: '请输入词表文本后再生成。' });
+      return;
+    }
+
+    set({ aiState: 'loading', aiError: null, aiDraft: null });
+
+    try {
+      const response = await fetch('/api/units/generate', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify({
+          unitName,
+          rawWordListText: rawText
+        })
+      });
+
+      if (!response.ok) {
+        throw new Error(`AI 服务异常：HTTP ${response.status}`);
+      }
+
+      const payload = await response.json() as {
+        suggestedUnitName?: string;
+        words?: unknown;
+      };
+
+      const suggestedName = normalizeUnitName(payload.suggestedUnitName ?? unitName, 'AI 生成单元');
+      const { validWords, errors } = validateWords(payload.words);
+
+      if (errors.length > 0) {
+        set({
+          aiState: 'error',
+          aiError: `AI 返回数据不符合导入规范：${errors[0]?.field} ${errors[0]?.message}`,
+          aiDraft: null
+        });
+        return;
+      }
+
+      set({
+        aiState: 'ready',
+        aiError: null,
+        aiDraft: {
+          suggestedUnitName: suggestedName,
+          words: validWords
+        }
+      });
+    } catch (error) {
+      set({
+        aiState: 'error',
+        aiError: error instanceof Error ? error.message : 'AI 生成失败，请稍后再试。',
+        aiDraft: null
+      });
+    }
+  },
+
+  saveGeneratedDraft: (unitName) => {
+    const state = get();
+    const {
+      aiDraft,
+      learningUnits,
+      unitWordsMap,
+      businessDay,
+      settings,
+      wordProgressMap,
+      orderQueue,
+      currentOrder,
+      feedback,
+      currentInput,
+      orderStartedAtMs,
+      phase,
+      phaseBeforeShop,
+      satisfaction
+    } = state;
+    if (!aiDraft) {
+      return;
+    }
+
+    const { unit, unitWords } = buildUnitFromWords(
+      aiDraft.words,
+      unitName ?? aiDraft.suggestedUnitName,
+      learningUnits
+    );
+
+    const nextUnits = [unit, ...learningUnits];
+    const nextMap: UnitWordsMap = {
+      ...unitWordsMap,
+      [unit.id]: unitWords
+    };
+
+    saveLearningUnits(nextUnits);
+    saveUnitWordsMap(nextMap);
+    saveActiveUnitId(unit.id);
+
+    const nextAllWords = rebuildAllWords(nextMap, unit.id);
+    const refreshed = rebuildRunningDayForNewPool({
+      businessDay,
+      allWords: nextAllWords,
+      settings,
+      wordProgressMap
+    });
+    const nextPhase: GamePhase = phase === 'show_order_feedback' ? 'serving_order' : phase;
+
+    set({
+      learningUnits: nextUnits,
+      unitWordsMap: nextMap,
+      activeUnitId: unit.id,
+      allWords: nextAllWords,
+      businessDay: refreshed?.businessDay ?? businessDay,
+      orderQueue: refreshed?.orderQueue ?? orderQueue,
+      currentOrder: refreshed?.currentOrder ?? currentOrder,
+      feedback: refreshed ? null : feedback,
+      currentInput: refreshed ? '' : currentInput,
+      orderStartedAtMs: refreshed ? Date.now() : orderStartedAtMs,
+      phase: refreshed ? nextPhase : phase,
+      importReport: {
+        addedWords: unitWords.length,
+        errors: [],
+        message: buildUnitMessage(unit.name, unitWords.length)
+      },
+      aiDraft: null,
+      aiState: 'idle',
+      aiError: null
+    });
+
+    if (refreshed) {
+      persistRuntimeFromState({
+        businessDay: refreshed.businessDay,
+        currentOrder: refreshed.currentOrder,
+        orderQueue: refreshed.orderQueue,
+        satisfaction,
+        phase: nextPhase,
+        phaseBeforeShop
+      });
+    }
+  },
+
+  clearGeneratedDraft: () => {
+    set({ aiDraft: null, aiState: 'idle', aiError: null });
+  },
+
+  clearImportReport: () => set({ importReport: null }),
+
+  setActiveLearningUnit: (unitId) => {
+    const state = get();
+    const {
+      learningUnits,
+      unitWordsMap,
+      businessDay,
+      settings,
+      wordProgressMap,
+      orderQueue,
+      currentOrder,
+      feedback,
+      currentInput,
+      orderStartedAtMs,
+      phase,
+      phaseBeforeShop,
+      satisfaction
+    } = state;
+
+    if (unitId !== null && !learningUnits.some((unit) => unit.id === unitId)) {
+      return;
+    }
+
+    const nextAllWords = rebuildAllWords(unitWordsMap, unitId);
+    const refreshed = rebuildRunningDayForNewPool({
+      businessDay,
+      allWords: nextAllWords,
+      settings,
+      wordProgressMap
+    });
+    const nextPhase: GamePhase = phase === 'show_order_feedback' ? 'serving_order' : phase;
+
+    saveActiveUnitId(unitId);
+    set({
+      activeUnitId: unitId,
+      allWords: nextAllWords,
+      businessDay: refreshed?.businessDay ?? businessDay,
+      orderQueue: refreshed?.orderQueue ?? orderQueue,
+      currentOrder: refreshed?.currentOrder ?? currentOrder,
+      feedback: refreshed ? null : feedback,
+      currentInput: refreshed ? '' : currentInput,
+      orderStartedAtMs: refreshed ? Date.now() : orderStartedAtMs,
+      phase: refreshed ? nextPhase : phase
+    });
+
+    if (refreshed) {
+      persistRuntimeFromState({
+        businessDay: refreshed.businessDay,
+        currentOrder: refreshed.currentOrder,
+        orderQueue: refreshed.orderQueue,
+        satisfaction,
+        phase: nextPhase,
+        phaseBeforeShop
+      });
+    }
+  },
+
+  renameLearningUnit: (unitId, nextName) => {
+    const normalized = nextName.trim();
+    if (!normalized) {
+      return;
+    }
+
+    const nextUnits = get().learningUnits.map((unit) => {
+      if (unit.id !== unitId) {
+        return unit;
+      }
+
+      return {
+        ...unit,
+        name: normalized,
+        updatedAt: new Date().toISOString()
+      };
+    });
+
+    saveLearningUnits(nextUnits);
+    set({ learningUnits: nextUnits });
+  },
+
+  deleteLearningUnit: (unitId) => {
+    const state = get();
+    const {
+      learningUnits,
+      unitWordsMap,
+      activeUnitId,
+      wordProgressMap,
+      businessDay,
+      settings,
+      orderQueue,
+      currentOrder,
+      feedback,
+      currentInput,
+      orderStartedAtMs,
+      phase,
+      phaseBeforeShop,
+      satisfaction
+    } = state;
+    if (!learningUnits.some((unit) => unit.id === unitId)) {
+      return;
+    }
+
+    const nextUnits = learningUnits.filter((unit) => unit.id !== unitId);
+    const nextMap: UnitWordsMap = { ...unitWordsMap };
+    delete nextMap[unitId];
+
+    const nextActiveUnitId =
+      activeUnitId === unitId
+        ? (nextUnits[0]?.id ?? null)
+        : activeUnitId;
+
+    const prefix = `${unitId}::`;
+    const nextProgressMap = Object.fromEntries(
+      Object.entries(wordProgressMap).filter(([wordId]) => !wordId.startsWith(prefix))
+    );
+
+    saveLearningUnits(nextUnits);
+    saveUnitWordsMap(nextMap);
+    saveActiveUnitId(nextActiveUnitId);
+    saveWordProgressMap(nextProgressMap);
+
+    const nextAllWords = rebuildAllWords(nextMap, nextActiveUnitId);
+    const refreshed = rebuildRunningDayForNewPool({
+      businessDay,
+      allWords: nextAllWords,
+      settings,
+      wordProgressMap: nextProgressMap
+    });
+    const nextPhase: GamePhase = phase === 'show_order_feedback' ? 'serving_order' : phase;
+
+    set({
+      learningUnits: nextUnits,
+      unitWordsMap: nextMap,
+      activeUnitId: nextActiveUnitId,
+      allWords: nextAllWords,
+      wordProgressMap: nextProgressMap,
+      businessDay: refreshed?.businessDay ?? businessDay,
+      orderQueue: refreshed?.orderQueue ?? orderQueue,
+      currentOrder: refreshed?.currentOrder ?? currentOrder,
+      feedback: refreshed ? null : feedback,
+      currentInput: refreshed ? '' : currentInput,
+      orderStartedAtMs: refreshed ? Date.now() : orderStartedAtMs,
+      phase: refreshed ? nextPhase : phase
+    });
+
+    if (refreshed) {
+      persistRuntimeFromState({
+        businessDay: refreshed.businessDay,
+        currentOrder: refreshed.currentOrder,
+        orderQueue: refreshed.orderQueue,
+        satisfaction,
+        phase: nextPhase,
+        phaseBeforeShop
+      });
+    }
+  }
 }));
 
 export const getCurrentOrder = (order: Order | null): Order | null => order;
@@ -1360,12 +1896,5 @@ export const getDayAccuracy = (progress: DayProgress | null): number => {
 
   return Math.round((progress.correctOrders / progress.servedOrders) * 100);
 };
-
-export const difficultyOptions: Array<{ label: string; value: Difficulty | 'mixed' }> = [
-  { label: '混合', value: 'mixed' },
-  { label: 'A1', value: 'A1' },
-  { label: 'A2', value: 'A2' },
-  { label: 'B1', value: 'B1' }
-];
 
 export const dayGoalDefault = DEFAULT_DAY_GOAL;

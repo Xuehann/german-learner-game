@@ -8,7 +8,6 @@ const words: Word[] = [
     english: 'apple',
     german: 'der Apfel',
     category: 'food',
-    difficulty: 'A1',
     sourceType: 'builtin'
   },
   {
@@ -16,7 +15,6 @@ const words: Word[] = [
     english: 'opinion',
     german: 'die Meinung',
     category: 'abstract',
-    difficulty: 'B1',
     sourceType: 'builtin'
   },
   {
@@ -24,7 +22,6 @@ const words: Word[] = [
     english: 'cloud',
     german: 'die Wolke',
     category: 'nature',
-    difficulty: 'A1',
     sourceType: 'imported'
   }
 ];
@@ -37,11 +34,11 @@ describe('resolveLearningPool', () => {
     expect(pool[0]?.id).toBe('imported-1');
   });
 
-  it('falls back to built-in A1 words when no imported words exist', () => {
+  it('falls back to built-in pool when no imported words exist', () => {
     const pool = resolveLearningPool(words.filter((word) => word.sourceType !== 'imported'));
 
-    expect(pool).toHaveLength(1);
-    expect(pool[0]?.id).toBe('builtin-a1');
+    expect(pool).toHaveLength(2);
+    expect(pool.map((word) => word.id)).toEqual(expect.arrayContaining(['builtin-a1', 'builtin-b1']));
   });
 });
 

@@ -1,5 +1,3 @@
-export type Difficulty = 'A1' | 'A2' | 'B1';
-
 export interface Word {
   id: string;
   english: string;
@@ -8,7 +6,6 @@ export interface Word {
   plural?: string;
   pastTense?: string;
   category: string;
-  difficulty: Difficulty;
   pronunciation?: string;
   example?: {
     german: string;
@@ -16,6 +13,16 @@ export interface Word {
   };
   sourceType?: 'builtin' | 'imported';
 }
+
+export interface LearningUnit {
+  id: string;
+  name: string;
+  createdAt: string;
+  updatedAt: string;
+  wordCount: number;
+}
+
+export type UnitWord = Word;
 
 export interface WordProgress {
   wordId: string;
@@ -114,7 +121,6 @@ export interface GameSession {
   startTime: string;
   endTime?: string;
   gameMode: 'butcher_business';
-  difficulty: Difficulty | 'mixed';
   dayGoal: DayGoal;
   dayProgress: DayProgress;
   accuracy: number;
@@ -153,11 +159,9 @@ export interface GameFeedback {
 }
 
 export interface GameSettings {
-  difficulty?: Difficulty | 'mixed';
   feedbackDelayMs: number;
   planDays: number;
   planStartDate: string;
-  planSource: 'imported_only';
   lastIntroDate?: string;
 }
 
@@ -170,6 +174,12 @@ export interface ImportValidationError {
 export interface ImportResult {
   addedWords: number;
   errors: ImportValidationError[];
+  message?: string;
+}
+
+export interface AIGeneratedUnitDraft {
+  suggestedUnitName: string;
+  words: Word[];
 }
 
 export interface BusinessRuntimeSnapshot {

@@ -3,10 +3,14 @@ import type {
   CoinWallet,
   GameSession,
   GameSettings,
+  LearningUnit,
   SausageCollection,
+  UnitWord,
   Word,
   WordProgress
 } from '../types';
+
+export type UnitWordsMap = Record<string, UnitWord[]>;
 
 const storageKeys = {
   userProgress: 'sausage_game_progress',
@@ -14,6 +18,9 @@ const storageKeys = {
   wordStats: 'sausage_game_word_stats',
   sessionHistory: 'sausage_game_sessions',
   importedWords: 'sausage_game_imported_words',
+  learningUnits: 'sausage_learning_units',
+  learningUnitWords: 'sausage_learning_unit_words',
+  activeUnitId: 'sausage_learning_active_unit_id',
   coinWallet: 'sausage_shop_coin_wallet',
   sausageCollection: 'sausage_shop_collection',
   runtimeSnapshot: 'sausage_shop_runtime_snapshot'
@@ -48,10 +55,32 @@ const removeKey = (key: string): void => {
   }
 };
 
-export const loadImportedWords = (): Word[] => readJson<Word[]>(storageKeys.importedWords, []);
+export const loadLegacyImportedWords = (): Word[] =>
+  readJson<Word[]>(storageKeys.importedWords, []);
 
-export const saveImportedWords = (words: Word[]): void => {
-  writeJson(storageKeys.importedWords, words);
+export const clearLegacyImportedWords = (): void => {
+  removeKey(storageKeys.importedWords);
+};
+
+export const loadLearningUnits = (): LearningUnit[] =>
+  readJson<LearningUnit[]>(storageKeys.learningUnits, []);
+
+export const saveLearningUnits = (units: LearningUnit[]): void => {
+  writeJson(storageKeys.learningUnits, units);
+};
+
+export const loadUnitWordsMap = (): UnitWordsMap =>
+  readJson<UnitWordsMap>(storageKeys.learningUnitWords, {});
+
+export const saveUnitWordsMap = (map: UnitWordsMap): void => {
+  writeJson(storageKeys.learningUnitWords, map);
+};
+
+export const loadActiveUnitId = (): string | null =>
+  readJson<string | null>(storageKeys.activeUnitId, null);
+
+export const saveActiveUnitId = (unitId: string | null): void => {
+  writeJson(storageKeys.activeUnitId, unitId);
 };
 
 export const loadGameSettings = (defaults: GameSettings): GameSettings =>
