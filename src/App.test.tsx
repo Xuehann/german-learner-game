@@ -93,6 +93,7 @@ describe('App', () => {
         feedback: {
           type: 'correct',
           title: '订单完成',
+          speech: 'Gut gemacht!',
           correctAnswer: 'der Apfel',
           userInput: 'der Apfel'
         }
@@ -115,6 +116,7 @@ describe('App', () => {
         feedback: {
           type: 'wrong',
           title: '订单出错',
+          speech: 'Das war nicht richtig.',
           correctAnswer: 'der Apfel',
           userInput: 'die Apfel',
           requiresManualContinue: true
@@ -132,6 +134,7 @@ describe('App', () => {
         feedback: {
           type: 'skip',
           title: '你跳过了订单',
+          speech: 'Ich warte dann auf die naechste Bestellung.',
           correctAnswer: 'der Apfel',
           userInput: '',
           requiresManualContinue: true
@@ -154,6 +157,7 @@ describe('App', () => {
         feedback: {
           type: 'correct',
           title: '订单完成',
+          speech: 'Sehr gut!',
           correctAnswer: 'der Apfel',
           userInput: 'der Apfel'
         }

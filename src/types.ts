@@ -202,9 +202,11 @@ export type GamePhase =
 export interface GameFeedback {
   type: 'correct' | 'wrong' | 'skip';
   title: string;
+  speech: string;
   correctAnswer: string;
   userInput: string;
   note?: string;
+  masteryHint?: string;
   requiresManualContinue?: boolean;
 }
 

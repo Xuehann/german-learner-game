@@ -108,6 +108,175 @@ describe('dynamic day goal helpers', () => {
   });
 });
 
+describe('customer queue behavior', () => {
+  beforeEach(() => {
+    window.localStorage.clear();
+    useGameStore.getState().resetAllLocalData();
+  });
+
+  it('keeps queue size at 5 and avoids same customer between current and first preview', () => {
+    const state = useGameStore.getState();
+    const queue = state.orderQueue;
+
+    expect(queue).toHaveLength(5);
+    expect(queue[0]?.id).toBe(state.currentOrder?.id);
+
+    const currentName = queue[0]?.customer.name;
+    const firstPreviewName = queue[1]?.customer.name;
+    expect(firstPreviewName).not.toBe(currentName);
+  });
+});
+
+describe('mastery feedback messaging', () => {
+  beforeEach(() => {
+    window.localStorage.clear();
+    useGameStore.getState().resetAllLocalData();
+  });
+
+  it('keeps newMastered unchanged and explains threshold when answer is correct but not yet mastered', () => {
+    const state = useGameStore.getState();
+    const businessDay = state.businessDay;
+    const word = state.allWords[0];
+
+    expect(businessDay).not.toBeNull();
+    expect(word).toBeDefined();
+
+    const order = {
+      id: 'order_mastery_hint',
+      type: 'translation' as const,
+      customer: {
+        id: 'cust_mastery_hint',
+        name: 'Anna',
+        tier: 'regular' as const,
+        avatar: '🧑‍🍳'
+      },
+      lines: [
+        {
+          wordId: word!.id,
+          english: word!.english,
+          german: word!.german,
+          category: word!.category,
+          pastTense: word!.pastTense
+        }
+      ],
+      prompt: `顾客点单：${word!.english}`,
+      instruction: '请输入完整德语拼写（含冠词时请一起输入）。'
+    };
+
+    useGameStore.setState({
+      phase: 'serving_order',
+      businessDay: {
+        ...businessDay!,
+        goal: {
+          newMasteredTarget: 99,
+          correctedMistakesTarget: 99
+        },
+        progress: {
+          newMastered: 0,
+          correctedMistakes: 0,
+          servedOrders: 0,
+          correctOrders: 0
+        }
+      },
+      currentOrder: order,
+      orderQueue: [order],
+      currentInput: word!.german,
+      orderStartedAtMs: Date.now() - 1500,
+      wordProgressMap: {
+        [word!.id]: {
+          wordId: word!.id,
+          attempts: 1,
+          correct: 0,
+          masteryLevel: 0,
+          lastReviewDate: '2026-04-01T00:00:00.000Z',
+          nextReviewDate: '2026-04-02T00:00:00.000Z',
+          averageResponseTime: 2,
+          errorPatterns: []
+        }
+      }
+    });
+
+    useGameStore.getState().submitOrderAnswer();
+
+    const after = useGameStore.getState();
+    expect(after.businessDay?.progress.newMastered).toBe(0);
+    expect(after.feedback?.type).toBe('correct');
+    expect(after.feedback?.speech.length ?? 0).toBeGreaterThan(0);
+    expect(after.feedback?.masteryHint).toContain('本题答对，但未达掌握阈值');
+  });
+
+  it('increments newMastered when mastery reaches level 3 and reports it in hint', () => {
+    const state = useGameStore.getState();
+    const businessDay = state.businessDay;
+    const word = state.allWords[0];
+
+    expect(businessDay).not.toBeNull();
+    expect(word).toBeDefined();
+
+    const order = {
+      id: 'order_mastery_reached',
+      type: 'translation' as const,
+      customer: {
+        id: 'cust_mastery_reached',
+        name: 'Lukas',
+        tier: 'regular' as const,
+        avatar: '👨‍🔧'
+      },
+      lines: [
+        {
+          wordId: word!.id,
+          english: word!.english,
+          german: word!.german,
+          category: word!.category,
+          pastTense: word!.pastTense
+        }
+      ],
+      prompt: `顾客点单：${word!.english}`,
+      instruction: '请输入完整德语拼写（含冠词时请一起输入）。'
+    };
+
+    useGameStore.setState({
+      phase: 'serving_order',
+      businessDay: {
+        ...businessDay!,
+        goal: {
+          newMasteredTarget: 99,
+          correctedMistakesTarget: 99
+        },
+        progress: {
+          newMastered: 0,
+          correctedMistakes: 0,
+          servedOrders: 0,
+          correctOrders: 0
+        }
+      },
+      currentOrder: order,
+      orderQueue: [order],
+      currentInput: word!.german,
+      orderStartedAtMs: Date.now() - 1500,
+      wordProgressMap: {
+        [word!.id]: {
+          wordId: word!.id,
+          attempts: 4,
+          correct: 3,
+          masteryLevel: 2,
+          lastReviewDate: '2026-04-01T00:00:00.000Z',
+          nextReviewDate: '2026-04-02T00:00:00.000Z',
+          averageResponseTime: 2,
+          errorPatterns: []
+        }
+      }
+    });
+
+    useGameStore.getState().submitOrderAnswer();
+
+    const after = useGameStore.getState();
+    expect(after.businessDay?.progress.newMastered).toBe(1);
+    expect(after.feedback?.type).toBe('correct');
+    expect(after.feedback?.masteryHint).toContain('达到 masteryLevel 3');
+  });
+});
+
 describe('updatePlanDaysForCurrentDay', () => {
   beforeEach(() => {
     window.localStorage.clear();
