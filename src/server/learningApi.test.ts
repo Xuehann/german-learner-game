@@ -2,7 +2,7 @@ import { describe, expect, it } from 'vitest';
 import { handleOrderExampleRequest } from './learningApi';
 
 describe('handleOrderExampleRequest', () => {
-  it('returns fallback sentence when OPENAI_API_KEY is missing', async () => {
+  it('returns bilingual fallback sentence when OPENAI_API_KEY is missing', async () => {
     const response = await handleOrderExampleRequest(
       JSON.stringify({
         orderType: 'translation',
@@ -20,7 +20,10 @@ describe('handleOrderExampleRequest', () => {
     expect(response.body).toMatchObject({
       source: 'fallback'
     });
-    expect((response.body as { example: string }).example.length).toBeGreaterThan(0);
+    const body = response.body as { exampleDe: string; exampleZh: string };
+    expect(body.exampleDe.length).toBeGreaterThan(0);
+    expect(body.exampleZh.length).toBeGreaterThan(0);
+    expect(body.exampleDe.trim().split(/\s+/).length).toBeGreaterThanOrEqual(8);
   });
 
   it('returns 400 when correctAnswer is missing', async () => {

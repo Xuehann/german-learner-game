@@ -48,9 +48,12 @@ function buildOrderHint(order: Order | null): string {
   return buildSingleHint(order.lines[0]?.german ?? '');
 }
 
-const buildLocalExampleSentence = (order: Order | null, fallbackAnswer: string): string => {
+const buildLocalExampleSentence = (order: Order | null, fallbackAnswer: string): { de: string; zh: string } => {
   if (!order) {
-    return `Heute lerne ich: ${fallbackAnswer}.`;
+    return {
+      de: `Im Alltag lernte sie, ${fallbackAnswer} in verschiedenen Kontexten sicher zu verwenden.`,
+      zh: `在日常中，她学会了在不同语境下稳定地使用“${fallbackAnswer}”。`
+    };
   }
 
   const first = order.lines[0];
@@ -58,20 +61,29 @@ const buildLocalExampleSentence = (order: Order | null, fallbackAnswer: string):
   const category = (first?.category ?? '').toLowerCase();
 
   if (category.includes('verb') || first?.category.includes('动词')) {
-    return `Ich übe heute das Verb ${base}.`;
+    return {
+      de: `Im Unterricht erklärte der Lehrer, wie man ${base} in formellen Gesprächen korrekt einsetzt.`,
+      zh: `课堂上，老师讲解了如何在正式交流中正确使用“${base}”。`
+    };
   }
 
   if (order.type === 'review') {
-    return `Zur Wiederholung merke ich mir: ${base}.`;
+    return {
+      de: `Zur Wiederholung formulierte sie einen längeren Satz, damit ${base} dauerhaft im Gedächtnis bleibt.`,
+      zh: `为了复习，她造了一个更长的句子，让“${base}”长期留在记忆中。`
+    };
   }
 
-  return `Heute bestelle ich ${base}.`;
+  return {
+    de: `In der Besprechung wurde betont, dass ${base} für die spätere Entscheidung eine wichtige Rolle spielt.`,
+    zh: `在讨论中大家强调，“${base}”对后续决策具有重要作用。`
+  };
 };
 
 type FeedbackExampleState =
   | { status: 'idle' }
   | { status: 'loading' }
-  | { status: 'ready'; text: string };
+  | { status: 'ready'; de: string; zh: string };
 
 const SKIN_PALETTE: Record<string, { shell: string; core: string; fleck: string }> = {
   'classic-link': { shell: '#bd6a3a', core: '#d8945f', fleck: '#7e4227' },
@@ -344,10 +356,11 @@ export function GamePage() {
           throw new Error(`HTTP ${response.status}`);
         }
 
-        const payload = (await response.json()) as { example?: unknown };
-        const example = typeof payload.example === 'string' ? payload.example.trim() : '';
+        const payload = (await response.json()) as { exampleDe?: unknown; exampleZh?: unknown };
+        const exampleDe = typeof payload.exampleDe === 'string' ? payload.exampleDe.trim() : '';
+        const exampleZh = typeof payload.exampleZh === 'string' ? payload.exampleZh.trim() : '';
 
-        if (!example) {
+        if (!exampleDe || !exampleZh) {
           throw new Error('empty example');
         }
 
@@ -355,7 +368,7 @@ export function GamePage() {
           return;
         }
 
-        setFeedbackExample({ status: 'ready', text: example });
+        setFeedbackExample({ status: 'ready', de: exampleDe, zh: exampleZh });
       } catch {
         if (controller.signal.aborted) {
           return;
@@ -365,7 +378,7 @@ export function GamePage() {
           return;
         }
 
-        setFeedbackExample({ status: 'ready', text: fallbackText });
+        setFeedbackExample({ status: 'ready', de: fallbackText.de, zh: fallbackText.zh });
       }
     };
 
@@ -883,14 +896,24 @@ export function GamePage() {
                     {feedback.note && <p>提示: {feedback.note}</p>}
                     {feedback.masteryHint && <p>掌握进度: {feedback.masteryHint}</p>}
                     {feedback.type === 'correct' && (
-                      <p className="mt-1">
-                        例句:{' '}
-                        {feedbackExample.status === 'loading'
-                          ? '生成中...'
-                          : feedbackExample.status === 'ready'
-                            ? feedbackExample.text
-                            : buildLocalExampleSentence(currentOrder, feedback.correctAnswer)}
-                      </p>
+                      <>
+                        <p className="mt-1">
+                          例句：{' '}
+                          {feedbackExample.status === 'loading'
+                            ? '生成中...'
+                            : feedbackExample.status === 'ready'
+                              ? feedbackExample.de
+                              : buildLocalExampleSentence(currentOrder, feedback.correctAnswer).de}
+                        </p>
+                        <p className="mt-1">
+                          翻译：{' '}
+                          {feedbackExample.status === 'loading'
+                            ? '生成中...'
+                            : feedbackExample.status === 'ready'
+                              ? feedbackExample.zh
+                              : buildLocalExampleSentence(currentOrder, feedback.correctAnswer).zh}
+                        </p>
+                      </>
                     )}
                     <p className="mt-2 font-semibold">点击继续（桌面可按 Enter）</p>
                   </div>
