@@ -200,6 +200,7 @@ describe('App', () => {
         feedback: {
           type: 'correct',
           title: '订单完成',
+          speech: 'Gut!',
           correctAnswer: 'der Apfel',
           userInput: 'der Apfel',
           requiresManualContinue: true
@@ -222,6 +223,7 @@ describe('App', () => {
         feedback: {
           type: 'wrong',
           title: '订单出错',
+          speech: 'Fast!',
           correctAnswer: 'der Apfel',
           userInput: 'die Apfel',
           requiresManualContinue: true
