@@ -5,7 +5,7 @@ export default {
   theme: {
     extend: {
       screens: {
-        mobileLandscape: { raw: '(orientation: landscape)' }
+        mobileLandscape: { raw: '(max-width: 1023px) and (orientation: landscape)' }
       },
       fontFamily: {
         heading: ['"Bree Serif"', 'Georgia', 'serif'],

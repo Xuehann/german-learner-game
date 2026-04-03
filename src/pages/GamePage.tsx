@@ -84,6 +84,7 @@ type FeedbackExampleState =
   | { status: 'idle' }
   | { status: 'loading' }
   | { status: 'ready'; de: string; zh: string };
+type LandscapePanel = 'queue' | 'dashboard';
 
 const SKIN_PALETTE: Record<string, { shell: string; core: string; fleck: string }> = {
   'classic-link': { shell: '#bd6a3a', core: '#d8945f', fleck: '#7e4227' },
@@ -207,6 +208,7 @@ export function GamePage() {
   const [introGoalPlanDaysInput, setIntroGoalPlanDaysInput] = useState(String(settings.planDays));
   const [introGoalPlanDaysError, setIntroGoalPlanDaysError] = useState<string | null>(null);
   const [feedbackExample, setFeedbackExample] = useState<FeedbackExampleState>({ status: 'idle' });
+  const [landscapePanel, setLandscapePanel] = useState<LandscapePanel>('queue');
   const inputRef = useRef<HTMLInputElement>(null);
   const feedbackExampleRequestRef = useRef(0);
 
@@ -290,6 +292,12 @@ export function GamePage() {
   useEffect(() => {
     setShowHint(false);
   }, [currentOrder?.id]);
+
+  useEffect(() => {
+    if (phase !== 'serving_order' && phase !== 'show_order_feedback') {
+      setLandscapePanel('queue');
+    }
+  }, [phase]);
 
   useEffect(() => {
     if (phase === 'serving_order') {
@@ -453,6 +461,334 @@ export function GamePage() {
 
   const showBusinessBoard =
     phase === 'serving_order' || phase === 'show_order_feedback' || phase === 'shop' || phase === 'intro_goal';
+
+  const queueCards = (
+    <div className="space-y-2">
+      {orderQueue.slice(1).map((order, idx) => (
+        <article key={order.id} className="rounded border-2 border-[#8a6640] bg-[#fff4e4] px-3 py-2 text-sm">
+          <div className="grid grid-cols-[48%_1fr] items-start gap-2">
+            <div className="min-w-0">
+              <CustomerPortrait customer={order.customer} size="preview" />
+            </div>
+            <div className="min-w-0">
+              <p className="font-semibold text-[#3a2817]">
+                #{idx + 1} {order.customer.name}
+              </p>
+              <p className="mt-1 text-xs text-[#3f2c1b]">{order.prompt}</p>
+            </div>
+          </div>
+        </article>
+      ))}
+    </div>
+  );
+
+  const queueSection = (
+    <section className="rounded-lg border-4 border-[#4b3018] bg-[#f8e5ca] p-3 shadow-[0_5px_0_#7e5a34]">
+      <h2 className="mb-2 text-lg font-semibold text-[#2f2114]">顾客预告</h2>
+      {queueCards}
+    </section>
+  );
+
+  const operationSection = (
+    <section className="rounded-lg border-4 border-[#4b3018] bg-[#fbe9cf] p-4 shadow-[0_5px_0_#7e5a34]">
+      <div className="mb-3 rounded border-2 border-[#7d5a37] bg-[#fff6e7] p-2.5 sm:p-3">
+        <p className="text-xs uppercase tracking-wide text-[#6a4a2d]">当前顾客</p>
+        <motion.div
+          key={currentOrder?.id ?? 'none'}
+          initial={{ opacity: 0, y: 10 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ duration: 0.35 }}
+          className="mt-1"
+        >
+          {currentCustomer ? (
+            <div className="flex flex-col gap-2 sm:flex-row sm:items-start sm:gap-2.5">
+              <div className="shrink-0">
+                <CustomerPortrait customer={currentCustomer} size="compact" />
+              </div>
+              <div className="min-w-0 flex-1">
+                <p className="text-base font-semibold text-[#2f2012] sm:text-lg">{currentCustomer.name}</p>
+                <div className="relative mt-1 w-full rounded-lg border-2 border-[#7f5d3a] bg-[#fff7ea] px-2.5 py-2 text-sm text-[#2f2012] shadow-[0_2px_0_#c9a77f] sm:px-3">
+                  <span className="pointer-events-none absolute -left-[7px] top-4 hidden h-3 w-3 rotate-45 border-b-2 border-l-2 border-[#7f5d3a] bg-[#fff7ea] sm:block" />
+                  <p className="font-semibold leading-tight">{customerSpeech}</p>
+                  {currentOrder?.prompt && <p className="mt-1 text-xs leading-snug text-[#5b4128]">{currentOrder.prompt}</p>}
+                  {currentOrder?.instruction && (
+                    <p className="mt-1 text-[11px] leading-snug text-[#6a4a2d]">{currentOrder.instruction}</p>
+                  )}
+                </div>
+              </div>
+            </div>
+          ) : (
+            <p className="text-sm font-semibold text-[#3a2817]">等待顾客...</p>
+          )}
+        </motion.div>
+      </div>
+
+      <div className="mb-3 rounded border-2 border-[#7d5a37] bg-[#fff6e7] p-3">
+        <p className="text-xs uppercase tracking-wide text-[#6a4a2d]">切肠工作台</p>
+        <div className="relative mt-2 h-28 overflow-hidden rounded border border-[#8f6a43] bg-[linear-gradient(180deg,#f8e7cf_0%,#e8c6a0_100%)]">
+          <div className="absolute inset-x-6 top-[54px] h-12 rounded-xl border border-[#8f6a43] bg-[linear-gradient(180deg,#d7a976_0%,#bc8a58_100%)]" />
+
+          <motion.div
+            key={`knife-${cutAnimTick}`}
+            data-testid="knife"
+            className="absolute right-8 top-[10px] h-14 w-[10px] origin-top rounded-sm bg-[#2f3138] shadow-[0_2px_0_#18191d]"
+            initial={{ y: -34, rotate: -24 }}
+            animate={
+              feedback?.type === 'correct'
+                ? { y: [-34, 16, 16], rotate: [-24, -6, -6] }
+                : { y: -34, rotate: -24 }
+            }
+            transition={{ duration: 1.05, ease: 'easeInOut' }}
+          />
+
+          {isSuccessfulCut ? (
+            <>
+              <motion.div
+                key={`left-piece-${cutAnimTick}`}
+                data-testid="sausage-half-left"
+                className="absolute left-[calc(50%-82px)] top-[58px] h-8 w-[74px] rounded-l-full border-2"
+                style={{ borderColor: palette.fleck, background: palette.shell }}
+                initial={{ x: 0, rotate: 0 }}
+                animate={{ x: -26, rotate: -11 }}
+                transition={{ duration: 1.05, ease: 'easeInOut' }}
+              >
+                <div
+                  className="mx-1 mt-[5px] h-[18px] rounded-l-full"
+                  style={{ background: `linear-gradient(180deg, ${palette.core} 0%, ${palette.shell} 100%)` }}
+                />
+              </motion.div>
+
+              <motion.div
+                key={`right-piece-${cutAnimTick}`}
+                data-testid="sausage-half-right"
+                className="absolute left-[calc(50%-2px)] top-[58px] h-8 w-[74px] rounded-r-full border-2"
+                style={{ borderColor: palette.fleck, background: palette.shell }}
+                initial={{ x: 0, rotate: 0 }}
+                animate={{ x: 26, rotate: 11 }}
+                transition={{ duration: 1.05, ease: 'easeInOut' }}
+              >
+                <div
+                  className="mx-1 mt-[5px] h-[18px] rounded-r-full"
+                  style={{ background: `linear-gradient(180deg, ${palette.core} 0%, ${palette.shell} 100%)` }}
+                />
+              </motion.div>
+            </>
+          ) : (
+            <div
+              data-testid="sausage-whole"
+              className="absolute left-[calc(50%-82px)] top-[58px] h-8 w-[154px] rounded-full border-2"
+              style={{ borderColor: palette.fleck, background: palette.shell }}
+            >
+              <div
+                className="mx-1 mt-[5px] h-[18px] rounded-full"
+                style={{ background: `linear-gradient(180deg, ${palette.core} 0%, ${palette.shell} 100%)` }}
+              />
+            </div>
+          )}
+
+          <AnimatePresence>
+            {feedback?.type === 'correct' && phase === 'show_order_feedback' && (
+              <motion.div
+                className="absolute left-1/2 top-11 h-1 w-1 rounded-full bg-[#f5dfbf]"
+                initial={{ opacity: 0, scale: 0.4 }}
+                animate={{ opacity: [0, 1, 0], scale: [0.4, 1.2, 0.6], y: [-2, -16, -24] }}
+                exit={{ opacity: 0 }}
+                transition={{ duration: 0.9 }}
+              />
+            )}
+          </AnimatePresence>
+        </div>
+
+        <div className="mt-2 flex flex-wrap gap-2">
+          {ownedSkins.map((skin) => {
+            const active = collection.displaySkinId === skin.id;
+            return (
+              <button
+                key={skin.id}
+                type="button"
+                onClick={() => setDisplaySausage(skin.id)}
+                className={`rounded border px-2 py-1 text-xs ${
+                  active ? 'border-[#335f3e] bg-[#dff8d4] text-[#224a2e]' : 'border-[#8a6540] bg-[#fff6e8] text-[#3f2b19]'
+                }`}
+              >
+                {skin.emoji} {skin.name}
+              </button>
+            );
+          })}
+        </div>
+      </div>
+
+      <form
+        className="space-y-3"
+        onSubmit={(event) => {
+          event.preventDefault();
+          submitOrderAnswer();
+        }}
+      >
+        <label htmlFor="order-input" className="block text-sm font-semibold text-[#3b2918]">
+          输入答案
+        </label>
+        <input
+          id="order-input"
+          ref={inputRef}
+          value={currentInput}
+          onChange={(event) => handleInputChange(event.target.value)}
+          onKeyDown={handleKeyDown}
+          disabled={disabledInput}
+          placeholder="例如: der Apfel"
+          className="w-full rounded border-2 border-[#7a5b39] bg-white px-3 py-3 text-lg text-[#2f2012] outline-none ring-[#94653a]/30 focus:ring disabled:cursor-not-allowed disabled:bg-stone-100"
+        />
+        <p className="text-xs text-[#5f4329]">快捷键: Alt+A/O/U/S {'->'} ä/ö/ü/ß</p>
+
+        <div className="flex flex-wrap gap-2">
+          <button
+            type="submit"
+            disabled={disabledInput}
+            className="rounded border-4 border-[#265735] bg-[#3d8f54] px-4 py-2 text-white shadow-[0_4px_0_#1f3f2a] disabled:cursor-not-allowed disabled:opacity-60"
+          >
+            提交订单
+          </button>
+          <button
+            type="button"
+            onClick={() => skipOrder()}
+            disabled={disabledInput}
+            className="rounded border-4 border-[#69431f] bg-[#b97531] px-4 py-2 text-white shadow-[0_4px_0_#633814] disabled:cursor-not-allowed disabled:opacity-60"
+          >
+            跳过
+          </button>
+          <button
+            type="button"
+            onClick={() => setShowHint((prev) => !prev)}
+            disabled={disabledInput}
+            className="rounded border-4 border-[#5a4631] bg-[#9a7a54] px-4 py-2 text-white shadow-[0_4px_0_#4b3826] disabled:cursor-not-allowed disabled:opacity-60"
+          >
+            提示
+          </button>
+        </div>
+      </form>
+
+      {showHint && currentOrder && (
+        <p className="mt-3 rounded border-2 border-[#786040] bg-[#fff1d9] px-3 py-2 text-sm text-[#3f2b18]">
+          提示: {buildOrderHint(currentOrder)}
+        </p>
+      )}
+
+      {feedback && (
+        <div
+          data-testid="order-feedback-card"
+          role={canContinueFeedback ? 'button' : undefined}
+          tabIndex={canContinueFeedback ? 0 : undefined}
+          onClick={continueFromFeedbackCard}
+          onKeyDown={(event) => {
+            if (event.key !== 'Enter' && event.key !== ' ') {
+              return;
+            }
+
+            event.preventDefault();
+            continueFromFeedbackCard();
+          }}
+          className={`mt-4 rounded border-2 p-3 text-sm ${
+            feedback.type === 'correct' ? 'border-[#2d6b3e] bg-[#e9ffdb] text-[#1f4a2b]' : 'border-[#8d2a1d] bg-[#ffe3de] text-[#6d2117]'
+          }`}
+        >
+          {feedback.type === 'correct' ? (
+            <>
+              <p>掌握进度: {feedback.masteryHint ?? '-/-'}</p>
+              <p className="mt-1">
+                例句：{' '}
+                {feedbackExample.status === 'loading'
+                  ? '生成中...'
+                  : feedbackExample.status === 'ready'
+                    ? feedbackExample.de
+                    : buildLocalExampleSentence(currentOrder, feedback.correctAnswer).de}
+              </p>
+              <p className="mt-1">
+                翻译：{' '}
+                {feedbackExample.status === 'loading'
+                  ? '生成中...'
+                  : feedbackExample.status === 'ready'
+                    ? feedbackExample.zh
+                    : buildLocalExampleSentence(currentOrder, feedback.correctAnswer).zh}
+              </p>
+              <p className="mt-2 font-semibold">点击继续（桌面可按 Enter）</p>
+            </>
+          ) : (
+            <>
+              <p>正确答案: {feedback.correctAnswer}</p>
+              <p className="mt-1">
+                你的输入:{' '}
+                <span className="font-medium">
+                  {inputDiffTokens.map((token, index) => (
+                    <span key={`${token.text}_${index}`} className={token.isError ? 'text-[#b31d17]' : undefined}>
+                      {token.text}
+                    </span>
+                  ))}
+                </span>
+              </p>
+              {feedback.note && <p>提示: {feedback.note}</p>}
+              <p>掌握进度: {feedback.masteryHint ?? '-/-'}</p>
+              <p className="mt-2 font-semibold">点击继续（桌面可按 Enter）</p>
+            </>
+          )}
+        </div>
+      )}
+    </section>
+  );
+
+  const dashboardCards = (
+    <>
+      <section className="rounded-lg border-4 border-[#4b3018] bg-[#f5e2c6] p-3 shadow-[0_5px_0_#7e5a34]">
+        <h2 className="text-lg font-semibold text-[#2f2012]">今日任务</h2>
+        <div className="mt-3 space-y-2 text-sm text-[#3e2b19]">
+          <p>
+            新增掌握词: {progress.newMastered} / {goal.newMasteredTarget}
+          </p>
+          <div className="h-3 rounded bg-[#d9bf9e]">
+            <div className="h-3 rounded bg-[#4a9a61]" style={{ width: `${masteredPct}%` }} />
+          </div>
+          <p className="text-xs text-[#5f4329]">注: 新增掌握词按 masteryLevel 3 统计。</p>
+          <p>
+            纠正错词: {progress.correctedMistakes} / {goal.correctedMistakesTarget}
+          </p>
+          <div className="h-3 rounded bg-[#d9bf9e]">
+            <div className="h-3 rounded bg-[#3f7dc7]" style={{ width: `${correctedPct}%` }} />
+          </div>
+          <p>已服务: {progress.servedOrders}</p>
+        </div>
+      </section>
+
+      <section className="rounded-lg border-4 border-[#4b3018] bg-[#f5e2c6] p-3 shadow-[0_5px_0_#7e5a34]">
+        <h2 className="text-lg font-semibold text-[#2f2012]">计划看板</h2>
+        <div className="mt-2 text-sm text-[#3e2b19]">
+          <p>总计划天数: {settings.planDays}</p>
+          <p>剩余天数: {planDaysLeft}</p>
+          <p>词池规模: {planPoolSize}</p>
+          <p>剩余未掌握词: {remainingUnmastered}</p>
+        </div>
+      </section>
+
+      <section className="rounded-lg border-4 border-[#4b3018] bg-[#f5e2c6] p-3 shadow-[0_5px_0_#7e5a34]">
+        <h2 className="text-lg font-semibold text-[#2f2012]">店铺状态</h2>
+        <div className="mt-2 text-sm text-[#3e2b19]">
+          <p>满意度: {satisfaction.current}</p>
+          <div className="mt-1 h-3 rounded bg-[#dcc5a8]">
+            <div
+              className="h-3 rounded bg-[#d1843f]"
+              style={{ width: `${Math.round((satisfaction.current / satisfaction.max) * 100)}%` }}
+            />
+          </div>
+          <p className="mt-2">金币: {coins.balance}（今日 +{coins.earnedToday}）</p>
+          <p className="mt-1">当前案板: {activeSkin ? `${activeSkin.emoji} ${activeSkin.name}` : '未设置'}</p>
+        </div>
+      </section>
+
+      <section className="rounded-lg border-4 border-[#4b3018] bg-[#f5e2c6] p-3 text-xs text-[#3f2b19] shadow-[0_5px_0_#7e5a34]">
+        <p>学习系统与经营系统解耦：</p>
+        <p>掌握判定由答题与复习决定，满意度仅影响金币收益。</p>
+        <p>今日答题记录: {answers.length} 条</p>
+      </section>
+    </>
+  );
 
   return (
     <main className="mx-auto min-h-screen max-w-[1320px] px-4 py-5 sm:px-6 lg:px-8">
@@ -653,334 +989,54 @@ export function GamePage() {
           )}
 
           {(phase === 'serving_order' || phase === 'show_order_feedback') && (
-            <div className="grid gap-4 mobileLandscape:grid-cols-[1fr_1.55fr_1.2fr] lg:grid-cols-[1fr_1.55fr_1.2fr]">
-              <section className="rounded-lg border-4 border-[#4b3018] bg-[#f8e5ca] p-3 shadow-[0_5px_0_#7e5a34]">
-                <h2 className="mb-2 text-lg font-semibold text-[#2f2114]">顾客预告</h2>
-                <div className="space-y-2">
-                  {orderQueue.slice(1).map((order, idx) => (
-                    <article key={order.id} className="rounded border-2 border-[#8a6640] bg-[#fff4e4] px-3 py-2 text-sm">
-                      <div className="grid grid-cols-[48%_1fr] items-start gap-2">
-                        <div className="min-w-0">
-                          <CustomerPortrait customer={order.customer} size="preview" />
-                        </div>
-                        <div className="min-w-0">
-                          <p className="font-semibold text-[#3a2817]">
-                            #{idx + 1} {order.customer.name}
-                          </p>
-                          <p className="mt-1 text-xs text-[#3f2c1b]">{order.prompt}</p>
-                        </div>
-                      </div>
-                    </article>
-                  ))}
-                </div>
-              </section>
-
-              <section className="rounded-lg border-4 border-[#4b3018] bg-[#fbe9cf] p-4 shadow-[0_5px_0_#7e5a34]">
-                <div className="mb-3 rounded border-2 border-[#7d5a37] bg-[#fff6e7] p-2.5 sm:p-3">
-                  <p className="text-xs uppercase tracking-wide text-[#6a4a2d]">当前顾客</p>
-                  <motion.div
-                    key={currentOrder?.id ?? 'none'}
-                    initial={{ opacity: 0, y: 10 }}
-                    animate={{ opacity: 1, y: 0 }}
-                    transition={{ duration: 0.35 }}
-                    className="mt-1"
-                  >
-                    {currentCustomer ? (
-                      <div className="flex flex-col gap-2 sm:flex-row sm:items-start sm:gap-2.5">
-                        <div className="shrink-0">
-                          <CustomerPortrait customer={currentCustomer} size="compact" />
-                        </div>
-                        <div className="min-w-0 flex-1">
-                          <p className="text-base font-semibold text-[#2f2012] sm:text-lg">{currentCustomer.name}</p>
-                          <div className="relative mt-1 w-full rounded-lg border-2 border-[#7f5d3a] bg-[#fff7ea] px-2.5 py-2 text-sm text-[#2f2012] shadow-[0_2px_0_#c9a77f] sm:px-3">
-                            <span className="pointer-events-none absolute -left-[7px] top-4 hidden h-3 w-3 rotate-45 border-b-2 border-l-2 border-[#7f5d3a] bg-[#fff7ea] sm:block" />
-                            <p className="font-semibold leading-tight">{customerSpeech}</p>
-                            {currentOrder?.prompt && (
-                              <p className="mt-1 text-xs leading-snug text-[#5b4128]">{currentOrder.prompt}</p>
-                            )}
-                            {currentOrder?.instruction && (
-                              <p className="mt-1 text-[11px] leading-snug text-[#6a4a2d]">{currentOrder.instruction}</p>
-                            )}
-                          </div>
-                        </div>
-                      </div>
-                    ) : (
-                      <p className="text-sm font-semibold text-[#3a2817]">等待顾客...</p>
-                    )}
-                  </motion.div>
-                </div>
-
-                <div className="mb-3 rounded border-2 border-[#7d5a37] bg-[#fff6e7] p-3">
-                  <p className="text-xs uppercase tracking-wide text-[#6a4a2d]">切肠工作台</p>
-                  <div className="relative mt-2 h-28 overflow-hidden rounded border border-[#8f6a43] bg-[linear-gradient(180deg,#f8e7cf_0%,#e8c6a0_100%)]">
-                    <div className="absolute inset-x-6 top-[54px] h-12 rounded-xl border border-[#8f6a43] bg-[linear-gradient(180deg,#d7a976_0%,#bc8a58_100%)]" />
-
-                    <motion.div
-                      key={`knife-${cutAnimTick}`}
-                      data-testid="knife"
-                      className="absolute right-8 top-[10px] h-14 w-[10px] origin-top rounded-sm bg-[#2f3138] shadow-[0_2px_0_#18191d]"
-                      initial={{ y: -34, rotate: -24 }}
-                      animate={
-                        feedback?.type === 'correct'
-                          ? { y: [-34, 16, 16], rotate: [-24, -6, -6] }
-                          : { y: -34, rotate: -24 }
-                      }
-                      transition={{ duration: 1.05, ease: 'easeInOut' }}
-                    />
-
-                    {isSuccessfulCut ? (
-                      <>
-                        <motion.div
-                          key={`left-piece-${cutAnimTick}`}
-                          data-testid="sausage-half-left"
-                          className="absolute left-[calc(50%-82px)] top-[58px] h-8 w-[74px] rounded-l-full border-2"
-                          style={{ borderColor: palette.fleck, background: palette.shell }}
-                          initial={{ x: 0, rotate: 0 }}
-                          animate={{ x: -26, rotate: -11 }}
-                          transition={{ duration: 1.05, ease: 'easeInOut' }}
-                        >
-                          <div
-                            className="mx-1 mt-[5px] h-[18px] rounded-l-full"
-                            style={{ background: `linear-gradient(180deg, ${palette.core} 0%, ${palette.shell} 100%)` }}
-                          />
-                        </motion.div>
-
-                        <motion.div
-                          key={`right-piece-${cutAnimTick}`}
-                          data-testid="sausage-half-right"
-                          className="absolute left-[calc(50%-2px)] top-[58px] h-8 w-[74px] rounded-r-full border-2"
-                          style={{ borderColor: palette.fleck, background: palette.shell }}
-                          initial={{ x: 0, rotate: 0 }}
-                          animate={{ x: 26, rotate: 11 }}
-                          transition={{ duration: 1.05, ease: 'easeInOut' }}
-                        >
-                          <div
-                            className="mx-1 mt-[5px] h-[18px] rounded-r-full"
-                            style={{ background: `linear-gradient(180deg, ${palette.core} 0%, ${palette.shell} 100%)` }}
-                          />
-                        </motion.div>
-                      </>
-                    ) : (
-                      <div
-                        data-testid="sausage-whole"
-                        className="absolute left-[calc(50%-82px)] top-[58px] h-8 w-[154px] rounded-full border-2"
-                        style={{ borderColor: palette.fleck, background: palette.shell }}
-                      >
-                        <div
-                          className="mx-1 mt-[5px] h-[18px] rounded-full"
-                          style={{ background: `linear-gradient(180deg, ${palette.core} 0%, ${palette.shell} 100%)` }}
-                        />
-                      </div>
-                    )}
-
-                    <AnimatePresence>
-                      {feedback?.type === 'correct' && phase === 'show_order_feedback' && (
-                        <motion.div
-                          className="absolute left-1/2 top-11 h-1 w-1 rounded-full bg-[#f5dfbf]"
-                          initial={{ opacity: 0, scale: 0.4 }}
-                          animate={{ opacity: [0, 1, 0], scale: [0.4, 1.2, 0.6], y: [-2, -16, -24] }}
-                          exit={{ opacity: 0 }}
-                          transition={{ duration: 0.9 }}
-                        />
-                      )}
-                    </AnimatePresence>
-                  </div>
-
-                  <div className="mt-2 flex flex-wrap gap-2">
-                    {ownedSkins.map((skin) => {
-                      const active = collection.displaySkinId === skin.id;
-                      return (
-                        <button
-                          key={skin.id}
-                          type="button"
-                          onClick={() => setDisplaySausage(skin.id)}
-                          className={`rounded border px-2 py-1 text-xs ${
-                            active
-                              ? 'border-[#335f3e] bg-[#dff8d4] text-[#224a2e]'
-                              : 'border-[#8a6540] bg-[#fff6e8] text-[#3f2b19]'
-                          }`}
-                        >
-                          {skin.emoji} {skin.name}
-                        </button>
-                      );
-                    })}
-                  </div>
-                </div>
-
-                <form
-                  className="space-y-3"
-                  onSubmit={(event) => {
-                    event.preventDefault();
-                    submitOrderAnswer();
-                  }}
-                >
-                  <label htmlFor="order-input" className="block text-sm font-semibold text-[#3b2918]">
-                    输入答案
-                  </label>
-                  <input
-                    id="order-input"
-                    ref={inputRef}
-                    value={currentInput}
-                    onChange={(event) => handleInputChange(event.target.value)}
-                    onKeyDown={handleKeyDown}
-                    disabled={disabledInput}
-                    placeholder="例如: der Apfel"
-                    className="w-full rounded border-2 border-[#7a5b39] bg-white px-3 py-3 text-lg text-[#2f2012] outline-none ring-[#94653a]/30 focus:ring disabled:cursor-not-allowed disabled:bg-stone-100"
-                  />
-                  <p className="text-xs text-[#5f4329]">快捷键: Alt+A/O/U/S {'->'} ä/ö/ü/ß</p>
-
-                  <div className="flex flex-wrap gap-2">
+            <>
+              <div className="hidden mobileLandscape:grid mobileLandscape:grid-cols-[1.6fr_1fr] mobileLandscape:gap-4 lg:hidden">
+                <div className="min-w-0">{operationSection}</div>
+                <section className="min-w-0 rounded-lg border-4 border-[#4b3018] bg-[#f5e2c6] p-3 shadow-[0_5px_0_#7e5a34]">
+                  <div className="mb-3 flex flex-wrap gap-2">
                     <button
-                      type="submit"
-                      disabled={disabledInput}
-                      className="rounded border-4 border-[#265735] bg-[#3d8f54] px-4 py-2 text-white shadow-[0_4px_0_#1f3f2a] disabled:cursor-not-allowed disabled:opacity-60"
+                      type="button"
+                      onClick={() => setLandscapePanel('queue')}
+                      className={`rounded border px-3 py-1 text-sm ${
+                        landscapePanel === 'queue'
+                          ? 'border-[#2f6b43] bg-[#dff8d4] text-[#224a2e]'
+                          : 'border-[#6a4a2d] bg-[#fff5e6] text-[#3f2b19]'
+                      }`}
                     >
-                      提交订单
+                      顾客队列
                     </button>
                     <button
                       type="button"
-                      onClick={() => skipOrder()}
-                      disabled={disabledInput}
-                      className="rounded border-4 border-[#69431f] bg-[#b97531] px-4 py-2 text-white shadow-[0_4px_0_#633814] disabled:cursor-not-allowed disabled:opacity-60"
+                      onClick={() => setLandscapePanel('dashboard')}
+                      className={`rounded border px-3 py-1 text-sm ${
+                        landscapePanel === 'dashboard'
+                          ? 'border-[#2f6b43] bg-[#dff8d4] text-[#224a2e]'
+                          : 'border-[#6a4a2d] bg-[#fff5e6] text-[#3f2b19]'
+                      }`}
                     >
-                      跳过
-                    </button>
-                    <button
-                      type="button"
-                      onClick={() => setShowHint((prev) => !prev)}
-                      disabled={disabledInput}
-                      className="rounded border-4 border-[#5a4631] bg-[#9a7a54] px-4 py-2 text-white shadow-[0_4px_0_#4b3826] disabled:cursor-not-allowed disabled:opacity-60"
-                    >
-                      提示
+                      任务看板
                     </button>
                   </div>
-                </form>
 
-                {showHint && currentOrder && (
-                  <p className="mt-3 rounded border-2 border-[#786040] bg-[#fff1d9] px-3 py-2 text-sm text-[#3f2b18]">
-                    提示: {buildOrderHint(currentOrder)}
-                  </p>
-                )}
-
-                {feedback && (
-                  <div
-                    data-testid="order-feedback-card"
-                    role={canContinueFeedback ? 'button' : undefined}
-                    tabIndex={canContinueFeedback ? 0 : undefined}
-                    onClick={continueFromFeedbackCard}
-                    onKeyDown={(event) => {
-                      if (event.key !== 'Enter' && event.key !== ' ') {
-                        return;
-                      }
-
-                      event.preventDefault();
-                      continueFromFeedbackCard();
-                    }}
-                    className={`mt-4 rounded border-2 p-3 text-sm ${
-                      feedback.type === 'correct'
-                        ? 'border-[#2d6b3e] bg-[#e9ffdb] text-[#1f4a2b]'
-                        : 'border-[#8d2a1d] bg-[#ffe3de] text-[#6d2117]'
-                    }`}
-                  >
-                    {feedback.type === 'correct' ? (
-                      <>
-                        <p>掌握进度: {feedback.masteryHint ?? '-/-'}</p>
-                        <p className="mt-1">
-                          例句：{' '}
-                          {feedbackExample.status === 'loading'
-                            ? '生成中...'
-                            : feedbackExample.status === 'ready'
-                              ? feedbackExample.de
-                              : buildLocalExampleSentence(currentOrder, feedback.correctAnswer).de}
-                        </p>
-                        <p className="mt-1">
-                          翻译：{' '}
-                          {feedbackExample.status === 'loading'
-                            ? '生成中...'
-                            : feedbackExample.status === 'ready'
-                              ? feedbackExample.zh
-                              : buildLocalExampleSentence(currentOrder, feedback.correctAnswer).zh}
-                        </p>
-                        <p className="mt-2 font-semibold">点击继续（桌面可按 Enter）</p>
-                      </>
+                  <div className="max-h-[calc(100dvh-15rem)] overflow-y-auto pr-1">
+                    {landscapePanel === 'queue' ? (
+                      <div className="rounded-lg border-4 border-[#4b3018] bg-[#f8e5ca] p-3 shadow-[0_5px_0_#7e5a34]">
+                        <h2 className="mb-2 text-lg font-semibold text-[#2f2114]">顾客预告</h2>
+                        {queueCards}
+                      </div>
                     ) : (
-                      <>
-                        <p>正确答案: {feedback.correctAnswer}</p>
-                        <p className="mt-1">
-                          你的输入:{' '}
-                          <span className="font-medium">
-                            {inputDiffTokens.map((token, index) => (
-                              <span
-                                key={`${token.text}_${index}`}
-                                className={token.isError ? 'text-[#b31d17]' : undefined}
-                              >
-                                {token.text}
-                              </span>
-                            ))}
-                          </span>
-                        </p>
-                        {feedback.note && <p>提示: {feedback.note}</p>}
-                        <p>掌握进度: {feedback.masteryHint ?? '-/-'}</p>
-                        <p className="mt-2 font-semibold">点击继续（桌面可按 Enter）</p>
-                      </>
+                      <div className="space-y-4">{dashboardCards}</div>
                     )}
                   </div>
-                )}
-              </section>
-
-              <aside className="space-y-4">
-                <section className="rounded-lg border-4 border-[#4b3018] bg-[#f5e2c6] p-3 shadow-[0_5px_0_#7e5a34]">
-                  <h2 className="text-lg font-semibold text-[#2f2012]">今日任务</h2>
-                  <div className="mt-3 space-y-2 text-sm text-[#3e2b19]">
-                    <p>
-                      新增掌握词: {progress.newMastered} / {goal.newMasteredTarget}
-                    </p>
-                    <div className="h-3 rounded bg-[#d9bf9e]">
-                      <div className="h-3 rounded bg-[#4a9a61]" style={{ width: `${masteredPct}%` }} />
-                    </div>
-                    <p className="text-xs text-[#5f4329]">注: 新增掌握词按 masteryLevel 3 统计。</p>
-                    <p>
-                      纠正错词: {progress.correctedMistakes} / {goal.correctedMistakesTarget}
-                    </p>
-                    <div className="h-3 rounded bg-[#d9bf9e]">
-                      <div className="h-3 rounded bg-[#3f7dc7]" style={{ width: `${correctedPct}%` }} />
-                    </div>
-                    <p>已服务: {progress.servedOrders}</p>
-                  </div>
                 </section>
+              </div>
 
-                <section className="rounded-lg border-4 border-[#4b3018] bg-[#f5e2c6] p-3 shadow-[0_5px_0_#7e5a34]">
-                  <h2 className="text-lg font-semibold text-[#2f2012]">计划看板</h2>
-                  <div className="mt-2 text-sm text-[#3e2b19]">
-                    <p>总计划天数: {settings.planDays}</p>
-                    <p>剩余天数: {planDaysLeft}</p>
-                    <p>词池规模: {planPoolSize}</p>
-                    <p>剩余未掌握词: {remainingUnmastered}</p>
-                  </div>
-                </section>
-
-                <section className="rounded-lg border-4 border-[#4b3018] bg-[#f5e2c6] p-3 shadow-[0_5px_0_#7e5a34]">
-                  <h2 className="text-lg font-semibold text-[#2f2012]">店铺状态</h2>
-                  <div className="mt-2 text-sm text-[#3e2b19]">
-                    <p>满意度: {satisfaction.current}</p>
-                    <div className="mt-1 h-3 rounded bg-[#dcc5a8]">
-                      <div
-                        className="h-3 rounded bg-[#d1843f]"
-                        style={{ width: `${Math.round((satisfaction.current / satisfaction.max) * 100)}%` }}
-                      />
-                    </div>
-                    <p className="mt-2">金币: {coins.balance}（今日 +{coins.earnedToday}）</p>
-                    <p className="mt-1">当前案板: {activeSkin ? `${activeSkin.emoji} ${activeSkin.name}` : '未设置'}</p>
-                  </div>
-                </section>
-
-                <section className="rounded-lg border-4 border-[#4b3018] bg-[#f5e2c6] p-3 text-xs text-[#3f2b19] shadow-[0_5px_0_#7e5a34]">
-                  <p>学习系统与经营系统解耦：</p>
-                  <p>掌握判定由答题与复习决定，满意度仅影响金币收益。</p>
-                  <p>今日答题记录: {answers.length} 条</p>
-                </section>
-              </aside>
-            </div>
+              <div className="grid gap-4 mobileLandscape:hidden lg:grid-cols-[1fr_1.55fr_1.2fr]">
+                {queueSection}
+                {operationSection}
+                <aside className="space-y-4">{dashboardCards}</aside>
+              </div>
+            </>
           )}
 
           {phase === 'day_summary' && (
