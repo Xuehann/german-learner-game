@@ -990,7 +990,7 @@ export function GamePage() {
 
           {(phase === 'serving_order' || phase === 'show_order_feedback') && (
             <>
-              <div className="hidden mobileLandscape:grid mobileLandscape:grid-cols-[1.6fr_1fr] mobileLandscape:gap-4 lg:hidden">
+              <div className="hidden mobileLandscape:grid mobileLandscape:grid-cols-[1.6fr_1fr] mobileLandscape:items-start mobileLandscape:gap-4 lg:hidden">
                 <div className="min-w-0">{operationSection}</div>
                 <section className="min-w-0 rounded-lg border-4 border-[#4b3018] bg-[#f5e2c6] p-3 shadow-[0_5px_0_#7e5a34]">
                   <div className="mb-3 flex flex-wrap gap-2">
@@ -1018,7 +1018,7 @@ export function GamePage() {
                     </button>
                   </div>
 
-                  <div className="max-h-[calc(100dvh-15rem)] overflow-y-auto pr-1">
+                  <div className="space-y-4">
                     {landscapePanel === 'queue' ? (
                       <div className="rounded-lg border-4 border-[#4b3018] bg-[#f8e5ca] p-3 shadow-[0_5px_0_#7e5a34]">
                         <h2 className="mb-2 text-lg font-semibold text-[#2f2114]">顾客预告</h2>

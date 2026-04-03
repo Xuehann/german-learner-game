@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { CITY_THEME_META, getCityById, getThemeFacts } from '../data/germanCities';
 import { useExploreStore } from '../store/exploreStore';
@@ -43,16 +43,26 @@ export function ExplorePage() {
 
   const [isPostcardModalOpen, setPostcardModalOpen] = useState(false);
   const [isAlbumModalOpen, setAlbumModalOpen] = useState(false);
+  const hasHandledInitialPostcard = useRef(false);
 
   useEffect(() => {
     initializeExplore();
   }, [initializeExplore]);
 
   useEffect(() => {
+    if (!isInitialized) {
+      return;
+    }
+
+    if (!hasHandledInitialPostcard.current) {
+      hasHandledInitialPostcard.current = true;
+      return;
+    }
+
     if (activePostcard) {
       setPostcardModalOpen(true);
     }
-  }, [activePostcard]);
+  }, [activePostcard, isInitialized]);
 
   const selectedCity = useMemo(() => {
     if (!selectedCityId) {
