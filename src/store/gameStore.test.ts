@@ -202,7 +202,7 @@ describe('mastery feedback messaging', () => {
     expect(after.businessDay?.progress.newMastered).toBe(0);
     expect(after.feedback?.type).toBe('correct');
     expect(after.feedback?.speech.length ?? 0).toBeGreaterThan(0);
-    expect(after.feedback?.masteryHint).toContain('本题答对，但未达掌握阈值');
+    expect(after.feedback?.masteryHint).toBe('1/3');
   });
 
   it('increments newMastered when mastery reaches level 3 and reports it in hint', () => {
@@ -273,7 +273,69 @@ describe('mastery feedback messaging', () => {
     const after = useGameStore.getState();
     expect(after.businessDay?.progress.newMastered).toBe(1);
     expect(after.feedback?.type).toBe('correct');
-    expect(after.feedback?.masteryHint).toContain('达到 masteryLevel 3');
+    expect(after.feedback?.masteryHint).toBe('3/3');
+  });
+
+  it('shows real mastery progress on skip based on historical correct count', () => {
+    const state = useGameStore.getState();
+    const businessDay = state.businessDay;
+    const word = state.allWords[0];
+
+    expect(businessDay).not.toBeNull();
+    expect(word).toBeDefined();
+
+    const order = {
+      id: 'order_skip_progress',
+      type: 'translation' as const,
+      customer: {
+        id: 'cust_skip_progress',
+        name: 'Lukas',
+        tier: 'regular' as const,
+        avatar: '👨‍🔧'
+      },
+      lines: [
+        {
+          wordId: word!.id,
+          english: word!.english,
+          german: word!.german,
+          category: word!.category,
+          pastTense: word!.pastTense
+        }
+      ],
+      prompt: `顾客点单：${word!.english}`,
+      instruction: '请输入完整德语拼写（含冠词时请一起输入）。'
+    };
+
+    useGameStore.setState({
+      phase: 'serving_order',
+      businessDay: {
+        ...businessDay!,
+        goal: {
+          newMasteredTarget: 99,
+          correctedMistakesTarget: 99
+        }
+      },
+      currentOrder: order,
+      orderQueue: [order],
+      currentInput: '',
+      wordProgressMap: {
+        [word!.id]: {
+          wordId: word!.id,
+          attempts: 3,
+          correct: 1,
+          masteryLevel: 1,
+          lastReviewDate: '2026-04-01T00:00:00.000Z',
+          nextReviewDate: '2026-04-02T00:00:00.000Z',
+          averageResponseTime: 2,
+          errorPatterns: []
+        }
+      }
+    });
+
+    useGameStore.getState().skipOrder();
+    const after = useGameStore.getState();
+    expect(after.feedback?.type).toBe('skip');
+    expect(after.feedback?.masteryHint).toBe('1/3');
   });
 });
 

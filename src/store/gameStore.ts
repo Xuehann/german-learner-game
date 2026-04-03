@@ -181,51 +181,34 @@ const clamp = (value: number, min: number, max: number): number => Math.max(min,
 const pickOne = <T>(items: T[]): T => items[Math.floor(Math.random() * items.length)] as T;
 const pickFeedbackSpeech = (type: GameFeedback['type']): string => pickOne(FEEDBACK_SPEECHES[type]);
 
-const remainingCorrectAnswersToMastery = (progress: Pick<WordProgress, 'attempts' | 'correct'>): number => {
-  const needAttempts = Math.max(0, 2 - progress.attempts);
-  const needAccuracy = Math.max(0, 4 * progress.attempts - 5 * progress.correct);
-  return Math.max(needAttempts, needAccuracy);
+const MASTERY_PROGRESS_TARGET = 3;
+
+const formatMasteryProgress = (correctCount: number): string => {
+  const clamped = clamp(correctCount, 0, MASTERY_PROGRESS_TARGET);
+  return `${clamped}/${MASTERY_PROGRESS_TARGET}`;
 };
 
-const buildMasteryHint = (
-  lineMastery: Array<{ german: string; next: WordProgress; becameMastered: boolean }>,
-  orderType: OrderType,
-  isCorrect: boolean
-): string | undefined => {
-  if (lineMastery.length === 0) {
+const buildMasteryHintFromCorrectCounts = (correctCounts: number[]): string | undefined => {
+  if (correctCounts.length === 0) {
     return undefined;
   }
 
-  const parts = lineMastery.map((item) => {
-    if (item.becameMastered) {
-      return `${item.german} 在本题达到 masteryLevel 3。`;
-    }
+  // For potential multi-line legacy orders, keep the most conservative progress.
+  const lowest = Math.min(...correctCounts.map((count) => clamp(count, 0, MASTERY_PROGRESS_TARGET)));
+  return formatMasteryProgress(lowest);
+};
 
-    const remaining = remainingCorrectAnswersToMastery(item.next);
-    if (remaining <= 0) {
-      return `${item.german} 当前已是掌握词（masteryLevel 3）。`;
-    }
+const buildMasteryHint = (
+  lineMastery: Array<{ german: string; next: WordProgress; becameMastered: boolean }>
+): string | undefined => {
+  return buildMasteryHintFromCorrectCounts(lineMastery.map((item) => item.next.correct));
+};
 
-    return `${item.german} 还差 ${remaining} 次正确作答可达 masteryLevel 3（当前 ${item.next.correct}/${item.next.attempts}）。`;
-  });
-
-  if (orderType !== 'combo') {
-    const first = lineMastery[0];
-    if (!first) {
-      return undefined;
-    }
-
-    if (isCorrect && !first.becameMastered) {
-      const remaining = remainingCorrectAnswersToMastery(first.next);
-      if (remaining > 0) {
-        return `本题答对，但未达掌握阈值。${parts[0] ?? ''}`;
-      }
-    }
-
-    return parts[0];
-  }
-
-  return parts.join('；');
+const buildMasteryHintFromProgressMap = (
+  lines: Array<{ wordId: string }>,
+  progressMap: Record<string, WordProgress>
+): string | undefined => {
+  return buildMasteryHintFromCorrectCounts(lines.map((line) => progressMap[line.wordId]?.correct ?? 0));
 };
 
 const mergeWords = (builtins: Word[], activeUnitWords: Word[]): Word[] => {
@@ -1405,7 +1388,7 @@ export const useGameStore = create<GameState>((set, get) => ({
 
     const verbPastTenseNote = isCorrect ? buildVerbPastTenseNote(currentOrder) : undefined;
     const mergedNote = [result.note, verbPastTenseNote].filter(Boolean).join('；');
-    const masteryHint = buildMasteryHint(lineMastery, currentOrder.type, isCorrect);
+    const masteryHint = buildMasteryHint(lineMastery);
     const feedbackType: GameFeedback['type'] = isCorrect ? 'correct' : 'wrong';
 
     const feedback: GameFeedback = {
@@ -1463,7 +1446,8 @@ export const useGameStore = create<GameState>((set, get) => ({
   },
 
   skipOrder: () => {
-    const { businessDay, currentOrder, currentInput, answers, satisfaction, orderQueue, phaseBeforeShop } = get();
+    const { businessDay, currentOrder, currentInput, answers, satisfaction, orderQueue, phaseBeforeShop, wordProgressMap } =
+      get();
 
     if (!businessDay || businessDay.isCompleted || !currentOrder) {
       return;
@@ -1505,7 +1489,7 @@ export const useGameStore = create<GameState>((set, get) => ({
       correctAnswer: buildCorrectAnswerText(currentOrder),
       userInput: currentInput,
       note: '满意度下降，已记录待复习词。',
-      masteryHint: '本题已跳过，不计入新增掌握词。',
+      masteryHint: buildMasteryHintFromProgressMap(currentOrder.lines, wordProgressMap),
       requiresManualContinue: true
     };
 

@@ -103,7 +103,8 @@ describe('App', () => {
           title: '订单完成',
           speech: 'Gut gemacht!',
           correctAnswer: 'der Apfel',
-          userInput: 'der Apfel'
+          userInput: 'der Apfel',
+          masteryHint: '1/3'
         }
       });
     });
@@ -113,6 +114,10 @@ describe('App', () => {
     expect(screen.getByTestId('sausage-half-left')).toBeInTheDocument();
     expect(screen.getByTestId('sausage-half-right')).toBeInTheDocument();
     expect(screen.getByTestId('order-feedback-card')).toHaveClass('bg-[#e9ffdb]');
+    expect(screen.getByText('掌握进度: 1/3')).toBeInTheDocument();
+    expect(screen.getByText('点击继续（桌面可按 Enter）')).toBeInTheDocument();
+    expect(screen.queryByText(/^正确答案:/)).not.toBeInTheDocument();
+    expect(screen.queryByText(/^你的输入:/)).not.toBeInTheDocument();
   });
 
   it('keeps whole sausage on wrong or skip feedback and uses red feedback style', async () => {
@@ -128,6 +133,7 @@ describe('App', () => {
           speech: 'Das war nicht richtig.',
           correctAnswer: 'der Apfel',
           userInput: 'die Apfel',
+          masteryHint: '1/3',
           requiresManualContinue: true
         }
       });
@@ -137,6 +143,9 @@ describe('App', () => {
     expect(screen.queryByTestId('sausage-half-left')).not.toBeInTheDocument();
     expect(screen.queryByTestId('sausage-half-right')).not.toBeInTheDocument();
     expect(screen.getByTestId('order-feedback-card')).toHaveClass('bg-[#ffe3de]');
+    expect(screen.getByText(/^正确答案:/)).toBeInTheDocument();
+    expect(screen.getByText(/^你的输入:/)).toBeInTheDocument();
+    expect(screen.getByText('掌握进度: 1/3')).toBeInTheDocument();
 
     act(() => {
       useGameStore.setState({
@@ -147,6 +156,7 @@ describe('App', () => {
           speech: 'Ich warte dann auf die naechste Bestellung.',
           correctAnswer: 'der Apfel',
           userInput: '',
+          masteryHint: '2/3',
           requiresManualContinue: true
         }
       });
@@ -156,6 +166,7 @@ describe('App', () => {
     expect(screen.queryByTestId('sausage-half-left')).not.toBeInTheDocument();
     expect(screen.queryByTestId('sausage-half-right')).not.toBeInTheDocument();
     expect(screen.getByTestId('order-feedback-card')).toHaveClass('bg-[#ffe3de]');
+    expect(screen.getByText('掌握进度: 2/3')).toBeInTheDocument();
   });
 
   it('resets to whole sausage after leaving correct feedback', async () => {

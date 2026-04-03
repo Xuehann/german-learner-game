@@ -882,21 +882,9 @@ export function GamePage() {
                         : 'border-[#8d2a1d] bg-[#ffe3de] text-[#6d2117]'
                     }`}
                   >
-                    <p>正确答案: {feedback.correctAnswer}</p>
-                    <p className="mt-1">
-                      你的输入:{' '}
-                      <span className="font-medium">
-                        {inputDiffTokens.map((token, index) => (
-                          <span key={`${token.text}_${index}`} className={token.isError ? 'text-[#b31d17]' : undefined}>
-                            {token.text}
-                          </span>
-                        ))}
-                      </span>
-                    </p>
-                    {feedback.note && <p>提示: {feedback.note}</p>}
-                    {feedback.masteryHint && <p>掌握进度: {feedback.masteryHint}</p>}
-                    {feedback.type === 'correct' && (
+                    {feedback.type === 'correct' ? (
                       <>
+                        <p>掌握进度: {feedback.masteryHint ?? '-/-'}</p>
                         <p className="mt-1">
                           例句：{' '}
                           {feedbackExample.status === 'loading'
@@ -913,9 +901,29 @@ export function GamePage() {
                               ? feedbackExample.zh
                               : buildLocalExampleSentence(currentOrder, feedback.correctAnswer).zh}
                         </p>
+                        <p className="mt-2 font-semibold">点击继续（桌面可按 Enter）</p>
+                      </>
+                    ) : (
+                      <>
+                        <p>正确答案: {feedback.correctAnswer}</p>
+                        <p className="mt-1">
+                          你的输入:{' '}
+                          <span className="font-medium">
+                            {inputDiffTokens.map((token, index) => (
+                              <span
+                                key={`${token.text}_${index}`}
+                                className={token.isError ? 'text-[#b31d17]' : undefined}
+                              >
+                                {token.text}
+                              </span>
+                            ))}
+                          </span>
+                        </p>
+                        {feedback.note && <p>提示: {feedback.note}</p>}
+                        <p>掌握进度: {feedback.masteryHint ?? '-/-'}</p>
+                        <p className="mt-2 font-semibold">点击继续（桌面可按 Enter）</p>
                       </>
                     )}
-                    <p className="mt-2 font-semibold">点击继续（桌面可按 Enter）</p>
                   </div>
                 )}
               </section>
