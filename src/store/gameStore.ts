@@ -158,6 +158,7 @@ const DEFAULT_COLLECTION: SausageCollection = {
 };
 
 const CUSTOMER_NAMES = ['Bär', 'Hund', 'Fuchs', 'Igel', 'Eule'];
+const ALLOWED_CUSTOMER_NAMES = new Set(CUSTOMER_NAMES);
 const CUSTOMER_AVATARS = ['🧑‍🍳', '👨‍🔧', '👩‍💼', '🧔', '👩‍🦰'];
 const FEEDBACK_SPEECHES: Record<GameFeedback['type'], string[]> = {
   correct: ['Gut gemacht!', 'Perfekt!', 'Sehr gut!', 'Ausgezeichnet!'],
@@ -632,6 +633,9 @@ const normalizeQueueNoAdjacentSameCustomer = (
   return normalized;
 };
 
+const filterQueueByAllowedCustomerNames = (queue: Order[]): Order[] =>
+  queue.filter((order) => ALLOWED_CUSTOMER_NAMES.has(order.customer.name));
+
 type AIState = 'idle' | 'loading' | 'error' | 'ready';
 
 interface GameState {
@@ -897,11 +901,13 @@ export const useGameStore = create<GameState>((set, get) => ({
 
     if (runtime && !runtime.businessDay.isCompleted && !hasLegacyArticleOrder(runtime)) {
       const hydratedDay = hydrateBusinessDay(runtime.businessDay, nextSettings, allWords);
-      const restoredCurrent = runtime.currentOrder;
+      const restoredCurrent =
+        runtime.currentOrder && ALLOWED_CUSTOMER_NAMES.has(runtime.currentOrder.customer.name) ? runtime.currentOrder : null;
+      const filteredRuntimeQueue = filterQueueByAllowedCustomerNames(runtime.orderQueue);
       const dedupedBaseQueue =
         restoredCurrent === null
-          ? [...runtime.orderQueue]
-          : [restoredCurrent, ...runtime.orderQueue.filter((order) => order.id !== restoredCurrent.id)];
+          ? [...filteredRuntimeQueue]
+          : [restoredCurrent, ...filteredRuntimeQueue.filter((order) => order.id !== restoredCurrent.id)];
 
       const normalizedQueue = normalizeQueueNoAdjacentSameCustomer(
         dedupedBaseQueue,
