@@ -653,7 +653,7 @@ export function GamePage() {
           )}
 
           {(phase === 'serving_order' || phase === 'show_order_feedback') && (
-            <div className="grid gap-4 lg:grid-cols-[1fr_1.55fr_1.2fr]">
+            <div className="grid gap-4 mobileLandscape:grid-cols-[1fr_1.55fr_1.2fr] lg:grid-cols-[1fr_1.55fr_1.2fr]">
               <section className="rounded-lg border-4 border-[#4b3018] bg-[#f8e5ca] p-3 shadow-[0_5px_0_#7e5a34]">
                 <h2 className="mb-2 text-lg font-semibold text-[#2f2114]">顾客预告</h2>
                 <div className="space-y-2">

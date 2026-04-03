@@ -4,6 +4,9 @@ export default {
   content: ['./index.html', './src/**/*.{ts,tsx}'],
   theme: {
     extend: {
+      screens: {
+        mobileLandscape: { raw: '(orientation: landscape)' }
+      },
       fontFamily: {
         heading: ['"Bree Serif"', 'Georgia', 'serif'],
         signboard: ['"Lobster"', '"Bree Serif"', 'Georgia', 'serif'],
