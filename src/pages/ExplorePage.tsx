@@ -128,7 +128,7 @@ export function ExplorePage() {
               <p className="text-xs uppercase tracking-[0.35em] text-[#cce8d5]">Germany Travel Deck</p>
               <h1 className="mt-2 font-heading text-3xl sm:text-4xl">出门旅游</h1>
               <p className="mt-2 max-w-2xl text-sm text-[#def0e2] sm:text-base">
-                先选城市，再随机抽取主题生成明信片。主题不会直接暴露提示词给用户。
+                先选城市，再随机抽取主题生成明信片。
               </p>
             </div>
             <div className="flex flex-wrap gap-2 text-sm">
