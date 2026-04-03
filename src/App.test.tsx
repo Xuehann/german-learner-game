@@ -1,6 +1,6 @@
-import { act, render, screen } from '@testing-library/react';
+import { act, fireEvent, render, screen } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
-import { beforeEach, describe, expect, it } from 'vitest';
+import { beforeEach, describe, expect, it, vi } from 'vitest';
 import App from './App';
 import { useGameStore } from './store/gameStore';
 
@@ -8,6 +8,14 @@ describe('App', () => {
   beforeEach(() => {
     window.localStorage.clear();
     window.history.pushState({}, '', '/');
+    vi.stubGlobal(
+      'fetch',
+      vi.fn().mockImplementation(
+        () => new Promise(() => {
+          // Keep pending in tests to avoid unrelated async state churn.
+        })
+      )
+    );
   });
 
   it('renders game page by default and hides import panel', async () => {
@@ -104,9 +112,10 @@ describe('App', () => {
     expect(screen.queryByTestId('sausage-whole')).not.toBeInTheDocument();
     expect(screen.getByTestId('sausage-half-left')).toBeInTheDocument();
     expect(screen.getByTestId('sausage-half-right')).toBeInTheDocument();
+    expect(screen.getByTestId('order-feedback-card')).toHaveClass('bg-[#e9ffdb]');
   });
 
-  it('keeps whole sausage on wrong or skip feedback', async () => {
+  it('keeps whole sausage on wrong or skip feedback and uses red feedback style', async () => {
     render(<App />);
     expect(await screen.findByRole('button', { name: '推门营业' })).toBeInTheDocument();
 
@@ -127,6 +136,7 @@ describe('App', () => {
     expect(screen.getByTestId('sausage-whole')).toBeInTheDocument();
     expect(screen.queryByTestId('sausage-half-left')).not.toBeInTheDocument();
     expect(screen.queryByTestId('sausage-half-right')).not.toBeInTheDocument();
+    expect(screen.getByTestId('order-feedback-card')).toHaveClass('bg-[#ffe3de]');
 
     act(() => {
       useGameStore.setState({
@@ -145,6 +155,7 @@ describe('App', () => {
     expect(screen.getByTestId('sausage-whole')).toBeInTheDocument();
     expect(screen.queryByTestId('sausage-half-left')).not.toBeInTheDocument();
     expect(screen.queryByTestId('sausage-half-right')).not.toBeInTheDocument();
+    expect(screen.getByTestId('order-feedback-card')).toHaveClass('bg-[#ffe3de]');
   });
 
   it('resets to whole sausage after leaving correct feedback', async () => {
@@ -177,5 +188,48 @@ describe('App', () => {
     expect(screen.getByTestId('sausage-whole')).toBeInTheDocument();
     expect(screen.queryByTestId('sausage-half-left')).not.toBeInTheDocument();
     expect(screen.queryByTestId('sausage-half-right')).not.toBeInTheDocument();
+  });
+
+  it('continues to next order when pressing Enter in feedback phase', async () => {
+    render(<App />);
+    expect(await screen.findByRole('button', { name: '推门营业' })).toBeInTheDocument();
+
+    act(() => {
+      useGameStore.setState({
+        phase: 'show_order_feedback',
+        feedback: {
+          type: 'correct',
+          title: '订单完成',
+          correctAnswer: 'der Apfel',
+          userInput: 'der Apfel',
+          requiresManualContinue: true
+        }
+      });
+    });
+
+    fireEvent.keyDown(window, { key: 'Enter' });
+    expect(useGameStore.getState().phase).toBe('serving_order');
+  });
+
+  it('continues to next order when clicking feedback card', async () => {
+    const user = userEvent.setup();
+    render(<App />);
+    expect(await screen.findByRole('button', { name: '推门营业' })).toBeInTheDocument();
+
+    act(() => {
+      useGameStore.setState({
+        phase: 'show_order_feedback',
+        feedback: {
+          type: 'wrong',
+          title: '订单出错',
+          correctAnswer: 'der Apfel',
+          userInput: 'die Apfel',
+          requiresManualContinue: true
+        }
+      });
+    });
+
+    await user.click(screen.getByTestId('order-feedback-card'));
+    expect(useGameStore.getState().phase).toBe('serving_order');
   });
 });

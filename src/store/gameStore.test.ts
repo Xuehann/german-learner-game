@@ -363,4 +363,40 @@ describe('intro entry behavior', () => {
     const state = useGameStore.getState();
     expect(state.phase).toBe('intro_door');
   });
+
+  it('migrates deprecated combo orders out of runtime queue on initialize', () => {
+    const current = useGameStore.getState();
+    const order = current.currentOrder;
+    expect(order).not.toBeNull();
+    expect(current.businessDay).not.toBeNull();
+
+    const comboOrder = {
+      ...order!,
+      id: 'legacy_combo_order',
+      type: 'combo' as const,
+      lines: [order!.lines[0]!, order!.lines[0]!],
+      prompt: 'legacy combo',
+      instruction: 'legacy combo'
+    };
+
+    saveRuntimeSnapshot({
+      businessDay: current.businessDay!,
+      orderQueue: [comboOrder, ...current.orderQueue],
+      currentOrder: comboOrder,
+      satisfaction: current.satisfaction,
+      phase: 'serving_order',
+      phaseBeforeShop: null
+    });
+
+    useGameStore.setState({
+      phase: 'shop',
+      businessDay: null
+    });
+
+    useGameStore.getState().initializeGame();
+    const restored = useGameStore.getState();
+
+    expect(restored.currentOrder?.type).not.toBe('combo');
+    expect(restored.orderQueue.every((item) => item.type !== 'combo')).toBe(true);
+  });
 });

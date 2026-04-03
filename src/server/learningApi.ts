@@ -14,6 +14,16 @@ export type PostcardGenerateRequest = {
   readingLevel?: string;
 };
 
+export type OrderExampleRequest = {
+  orderType?: 'translation' | 'review' | 'combo';
+  correctAnswer?: string;
+  words?: Array<{
+    german?: string;
+    english?: string;
+    category?: string;
+  }>;
+};
+
 export type UnitWord = {
   id: string;
   english: string;
@@ -32,6 +42,11 @@ export type GeneratedPostcardPayload = {
 export type GeneratedPostcardApiResponse = GeneratedPostcardPayload & {
   imageUrl: string;
   imageSource: PostcardImageSource;
+};
+
+export type GeneratedOrderExampleApiResponse = {
+  example: string;
+  source: 'ai' | 'fallback';
 };
 
 export type OpenAISettings = {
@@ -169,6 +184,35 @@ const isGeneratedPostcardPayload = (payload: unknown): payload is GeneratedPostc
   );
 };
 
+const isGeneratedOrderExamplePayload = (payload: unknown): payload is { example: string } => {
+  if (!payload || typeof payload !== 'object') {
+    return false;
+  }
+
+  const candidate = payload as Record<string, unknown>;
+  return typeof candidate.example === 'string' && candidate.example.trim().length > 0;
+};
+
+const buildFallbackOrderExample = (request: {
+  orderType: 'translation' | 'review' | 'combo';
+  correctAnswer: string;
+  words: Array<{ german: string; english: string; category: string }>;
+}): string => {
+  const first = request.words[0];
+  const base = first?.german.trim() || request.correctAnswer.trim();
+  const category = (first?.category ?? '').toLowerCase();
+
+  if (category.includes('verb') || first?.category.includes('动词')) {
+    return `Ich übe heute das Verb ${base}.`;
+  }
+
+  if (request.orderType === 'review') {
+    return `Zur Wiederholung merke ich mir: ${base}.`;
+  }
+
+  return `Heute bestelle ich ${base}.`;
+};
+
 const generatePostcardFromOpenAI = async (
   request: Required<PostcardGenerateRequest>,
   settings: OpenAISettings
@@ -265,6 +309,90 @@ const generatePostcardFromOpenAI = async (
   }
 };
 
+const generateOrderExampleFromOpenAI = async (
+  request: {
+    orderType: 'translation' | 'review' | 'combo';
+    correctAnswer: string;
+    words: Array<{ german: string; english: string; category: string }>;
+  },
+  settings: OpenAISettings
+): Promise<string> => {
+  const apiKey = settings.apiKey;
+  if (!apiKey) {
+    throw new Error('AI 服务未配置 OPENAI_API_KEY。');
+  }
+
+  const wordHints = request.words
+    .slice(0, 3)
+    .map((word) => `${word.german} (${word.english}; ${word.category || 'general'})`)
+    .join('; ');
+
+  const controller = new AbortController();
+  const timeout = setTimeout(() => controller.abort(), 15000);
+
+  try {
+    const response = await fetch('https://api.openai.com/v1/chat/completions', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        Authorization: `Bearer ${apiKey}`
+      },
+      body: JSON.stringify({
+        model: settings.textModel,
+        temperature: 0.7,
+        response_format: {
+          type: 'json_object'
+        },
+        messages: [
+          {
+            role: 'system',
+            content:
+              'You are a German tutor. Return JSON only with key "example". Provide one short natural German sentence (A1-A2).'
+          },
+          {
+            role: 'user',
+            content: `Order type: ${request.orderType}. Correct answer: ${request.correctAnswer}. Key words: ${wordHints}.`
+          }
+        ]
+      }),
+      signal: controller.signal
+    });
+
+    if (!response.ok) {
+      const raw = await response.text();
+      throw new Error(`OpenAI 请求失败：HTTP ${response.status} ${raw.slice(0, 160)}`.trim());
+    }
+
+    const payload = (await response.json()) as {
+      choices?: Array<{
+        message?: {
+          content?: string | null;
+        };
+      }>;
+    };
+
+    const content = payload.choices?.[0]?.message?.content;
+    if (typeof content !== 'string' || !content.trim()) {
+      throw new Error('OpenAI 返回内容为空。');
+    }
+
+    const parsed = extractJsonObject(content);
+    if (!isGeneratedOrderExamplePayload(parsed)) {
+      throw new Error('AI 例句返回 JSON 缺少 example 字段。');
+    }
+
+    return parsed.example.trim();
+  } catch (error) {
+    if (error instanceof Error && error.name === 'AbortError') {
+      throw new Error('AI 例句生成超时。');
+    }
+
+    throw error;
+  } finally {
+    clearTimeout(timeout);
+  }
+};
+
 export const normalizeRequestBody = (value: unknown): string => {
   if (typeof value === 'string') {
     return value;
@@ -329,6 +457,69 @@ export const handleUnitGenerateRequest = async (
         words
       }
     };
+  } catch (error) {
+    return {
+      statusCode: 400,
+      body: {
+        error: error instanceof Error ? error.message : 'Invalid JSON payload'
+      }
+    };
+  }
+};
+
+export const handleOrderExampleRequest = async (
+  rawBody: string,
+  settings: OpenAISettings
+): Promise<ApiHandlerResponse> => {
+  try {
+    const payload = JSON.parse(rawBody) as OrderExampleRequest;
+    const correctAnswer = payload.correctAnswer?.trim() ?? '';
+
+    if (!correctAnswer) {
+      return {
+        statusCode: 400,
+        body: { error: 'correctAnswer is required' }
+      };
+    }
+
+    const orderType: 'translation' | 'review' | 'combo' =
+      payload.orderType === 'review' ? 'review' : payload.orderType === 'combo' ? 'combo' : 'translation';
+    const words = Array.isArray(payload.words)
+      ? payload.words
+          .map((word) => ({
+            german: word.german?.trim() ?? '',
+            english: word.english?.trim() ?? '',
+            category: word.category?.trim() ?? 'general'
+          }))
+          .filter((word) => word.german.length > 0 || word.english.length > 0)
+      : [];
+
+    const normalized = {
+      orderType,
+      correctAnswer,
+      words: words.length > 0 ? words : [{ german: correctAnswer, english: '', category: 'general' }]
+    };
+
+    const fallback = buildFallbackOrderExample(normalized);
+
+    try {
+      const example = await generateOrderExampleFromOpenAI(normalized, settings);
+      return {
+        statusCode: 200,
+        body: {
+          example,
+          source: 'ai'
+        } satisfies GeneratedOrderExampleApiResponse
+      };
+    } catch {
+      return {
+        statusCode: 200,
+        body: {
+          example: fallback,
+          source: 'fallback'
+        } satisfies GeneratedOrderExampleApiResponse
+      };
+    }
   } catch (error) {
     return {
       statusCode: 400,

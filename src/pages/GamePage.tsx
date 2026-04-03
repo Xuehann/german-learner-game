@@ -2,6 +2,7 @@ import { useEffect, useMemo, useRef, useState } from 'react';
 import type { KeyboardEvent } from 'react';
 import { AnimatePresence, motion } from 'framer-motion';
 import { Link } from 'react-router-dom';
+import { buildAnswerDiffTokens } from '../lib/answerDiff';
 import { ALT_CHAR_MAP } from '../lib/germanInput';
 import {
   countRemainingUnmastered,
@@ -46,6 +47,31 @@ function buildOrderHint(order: Order | null): string {
 
   return buildSingleHint(order.lines[0]?.german ?? '');
 }
+
+const buildLocalExampleSentence = (order: Order | null, fallbackAnswer: string): string => {
+  if (!order) {
+    return `Heute lerne ich: ${fallbackAnswer}.`;
+  }
+
+  const first = order.lines[0];
+  const base = first?.german?.trim() || fallbackAnswer.trim();
+  const category = (first?.category ?? '').toLowerCase();
+
+  if (category.includes('verb') || first?.category.includes('动词')) {
+    return `Ich übe heute das Verb ${base}.`;
+  }
+
+  if (order.type === 'review') {
+    return `Zur Wiederholung merke ich mir: ${base}.`;
+  }
+
+  return `Heute bestelle ich ${base}.`;
+};
+
+type FeedbackExampleState =
+  | { status: 'idle' }
+  | { status: 'loading' }
+  | { status: 'ready'; text: string };
 
 const SKIN_PALETTE: Record<string, { shell: string; core: string; fleck: string }> = {
   'classic-link': { shell: '#bd6a3a', core: '#d8945f', fleck: '#7e4227' },
@@ -168,7 +194,9 @@ export function GamePage() {
   const [showIntroGoalEditor, setShowIntroGoalEditor] = useState(false);
   const [introGoalPlanDaysInput, setIntroGoalPlanDaysInput] = useState(String(settings.planDays));
   const [introGoalPlanDaysError, setIntroGoalPlanDaysError] = useState<string | null>(null);
+  const [feedbackExample, setFeedbackExample] = useState<FeedbackExampleState>({ status: 'idle' });
   const inputRef = useRef<HTMLInputElement>(null);
+  const feedbackExampleRequestRef = useRef(0);
 
   const learningPool = useMemo(() => resolveLearningPool(allWords), [allWords]);
   const remainingUnmastered = useMemo(
@@ -264,20 +292,7 @@ export function GamePage() {
   }, [feedback?.type, phase]);
 
   useEffect(() => {
-    if (phase !== 'show_order_feedback') {
-      return undefined;
-    }
-
-    if (feedback?.requiresManualContinue) {
-      return undefined;
-    }
-
-    const timer = window.setTimeout(() => continueAfterFeedback(), settings.feedbackDelayMs);
-    return () => window.clearTimeout(timer);
-  }, [continueAfterFeedback, feedback?.requiresManualContinue, phase, settings.feedbackDelayMs]);
-
-  useEffect(() => {
-    if (phase !== 'show_order_feedback' || !feedback?.requiresManualContinue) {
+    if (phase !== 'show_order_feedback' || !feedback) {
       return undefined;
     }
 
@@ -292,7 +307,71 @@ export function GamePage() {
 
     window.addEventListener('keydown', handleEnter);
     return () => window.removeEventListener('keydown', handleEnter);
-  }, [continueAfterFeedback, feedback?.requiresManualContinue, phase]);
+  }, [continueAfterFeedback, feedback, phase]);
+
+  useEffect(() => {
+    if (phase !== 'show_order_feedback' || feedback?.type !== 'correct' || !currentOrder) {
+      setFeedbackExample({ status: 'idle' });
+      return undefined;
+    }
+
+    const fallbackText = buildLocalExampleSentence(currentOrder, feedback.correctAnswer);
+    const requestId = feedbackExampleRequestRef.current + 1;
+    feedbackExampleRequestRef.current = requestId;
+    setFeedbackExample({ status: 'loading' });
+
+    const controller = new AbortController();
+    const run = async () => {
+      try {
+        const response = await fetch('/api/orders/example', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json'
+          },
+          body: JSON.stringify({
+            orderType: currentOrder.type,
+            correctAnswer: feedback.correctAnswer,
+            words: currentOrder.lines.map((line) => ({
+              german: line.german,
+              english: line.english,
+              category: line.category
+            }))
+          }),
+          signal: controller.signal
+        });
+
+        if (!response.ok) {
+          throw new Error(`HTTP ${response.status}`);
+        }
+
+        const payload = (await response.json()) as { example?: unknown };
+        const example = typeof payload.example === 'string' ? payload.example.trim() : '';
+
+        if (!example) {
+          throw new Error('empty example');
+        }
+
+        if (feedbackExampleRequestRef.current !== requestId) {
+          return;
+        }
+
+        setFeedbackExample({ status: 'ready', text: example });
+      } catch {
+        if (controller.signal.aborted) {
+          return;
+        }
+
+        if (feedbackExampleRequestRef.current !== requestId) {
+          return;
+        }
+
+        setFeedbackExample({ status: 'ready', text: fallbackText });
+      }
+    };
+
+    void run();
+    return () => controller.abort();
+  }, [currentOrder, currentOrder?.id, feedback?.correctAnswer, feedback?.type, phase]);
 
   useEffect(() => {
     if (phase === 'day_summary') {
@@ -334,6 +413,17 @@ export function GamePage() {
   const isServing = phase === 'serving_order';
   const disabledInput = !isServing || !currentOrder;
   const isSuccessfulCut = phase === 'show_order_feedback' && feedback?.type === 'correct';
+  const canContinueFeedback = phase === 'show_order_feedback' && Boolean(feedback);
+  const inputDiffTokens =
+    feedback && phase === 'show_order_feedback' ? buildAnswerDiffTokens(feedback.userInput, feedback.correctAnswer) : [];
+
+  const continueFromFeedbackCard = () => {
+    if (!canContinueFeedback) {
+      return;
+    }
+
+    continueAfterFeedback();
+  };
 
   const saveIntroGoalPlanDays = () => {
     const parsed = Number.parseInt(introGoalPlanDaysInput, 10);
@@ -761,21 +851,48 @@ export function GamePage() {
 
                 {feedback && (
                   <div
+                    data-testid="order-feedback-card"
+                    role={canContinueFeedback ? 'button' : undefined}
+                    tabIndex={canContinueFeedback ? 0 : undefined}
+                    onClick={continueFromFeedbackCard}
+                    onKeyDown={(event) => {
+                      if (event.key !== 'Enter' && event.key !== ' ') {
+                        return;
+                      }
+
+                      event.preventDefault();
+                      continueFromFeedbackCard();
+                    }}
                     className={`mt-4 rounded border-2 p-3 text-sm ${
                       feedback.type === 'correct'
                         ? 'border-[#2d6b3e] bg-[#e9ffdb] text-[#1f4a2b]'
-                        : feedback.type === 'wrong'
-                          ? 'border-[#8d2a1d] bg-[#ffe3de] text-[#6d2117]'
-                        : 'border-[#6c542f] bg-[#fff1da] text-[#5c4424]'
+                        : 'border-[#8d2a1d] bg-[#ffe3de] text-[#6d2117]'
                     }`}
                   >
-                    <p className="font-semibold">订单纠错信息</p>
-                    <p>{feedback.title}</p>
                     <p>正确答案: {feedback.correctAnswer}</p>
-                    <p>你的输入: {feedback.userInput || '(空)'}</p>
+                    <p className="mt-1">
+                      你的输入:{' '}
+                      <span className="font-medium">
+                        {inputDiffTokens.map((token, index) => (
+                          <span key={`${token.text}_${index}`} className={token.isError ? 'text-[#b31d17]' : undefined}>
+                            {token.text}
+                          </span>
+                        ))}
+                      </span>
+                    </p>
                     {feedback.note && <p>提示: {feedback.note}</p>}
                     {feedback.masteryHint && <p>掌握进度: {feedback.masteryHint}</p>}
-                    {feedback.requiresManualContinue && <p className="mt-1 font-semibold">按 Enter 继续下一单</p>}
+                    {feedback.type === 'correct' && (
+                      <p className="mt-1">
+                        例句:{' '}
+                        {feedbackExample.status === 'loading'
+                          ? '生成中...'
+                          : feedbackExample.status === 'ready'
+                            ? feedbackExample.text
+                            : buildLocalExampleSentence(currentOrder, feedback.correctAnswer)}
+                      </p>
+                    )}
+                    <p className="mt-2 font-semibold">点击继续（桌面可按 Enter）</p>
                   </div>
                 )}
               </section>

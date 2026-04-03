@@ -391,7 +391,7 @@ const chooseOrderType = (hasPendingCorrections: boolean): OrderType => {
     return 'review';
   }
 
-  const bucket: OrderType[] = ['translation', 'translation', 'combo', 'translation'];
+  const bucket: OrderType[] = ['translation', 'translation', 'translation', 'translation'];
   return pickOne(bucket);
 };
 
@@ -532,6 +532,8 @@ const hasLegacyArticleOrder = (runtime: {
 
   return runtime.orderQueue.some((order) => order.type === 'article');
 };
+
+const isDeprecatedComboOrder = (order: { type?: string } | null | undefined): boolean => order?.type === 'combo';
 
 const buildOrder = (
   allWords: Word[],
@@ -902,8 +904,14 @@ export const useGameStore = create<GameState>((set, get) => ({
     if (runtime && !runtime.businessDay.isCompleted && !hasLegacyArticleOrder(runtime)) {
       const hydratedDay = hydrateBusinessDay(runtime.businessDay, nextSettings, allWords);
       const restoredCurrent =
-        runtime.currentOrder && ALLOWED_CUSTOMER_NAMES.has(runtime.currentOrder.customer.name) ? runtime.currentOrder : null;
-      const filteredRuntimeQueue = filterQueueByAllowedCustomerNames(runtime.orderQueue);
+        runtime.currentOrder &&
+        ALLOWED_CUSTOMER_NAMES.has(runtime.currentOrder.customer.name) &&
+        !isDeprecatedComboOrder(runtime.currentOrder)
+          ? runtime.currentOrder
+          : null;
+      const filteredRuntimeQueue = filterQueueByAllowedCustomerNames(runtime.orderQueue).filter(
+        (order) => !isDeprecatedComboOrder(order)
+      );
       const dedupedBaseQueue =
         restoredCurrent === null
           ? [...filteredRuntimeQueue]
@@ -1408,7 +1416,7 @@ export const useGameStore = create<GameState>((set, get) => ({
       userInput: currentInput,
       note: mergedNote || undefined,
       masteryHint,
-      requiresManualContinue: !isCorrect
+      requiresManualContinue: true
     };
 
     const nextAnswer: GameAnswer = {
